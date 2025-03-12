@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "my-python-app"
+version = "0.1.0"
+description = "A simple Python app for CI/CD testing"
+authors = ["Your Name <your.email@example.com>"]
+packages = [{ include = "my_project" }]  # <--- Add this line
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-cov = "^6.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

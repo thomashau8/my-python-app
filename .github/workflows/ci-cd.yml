@@ -5,15 +5,32 @@ on:
     branches:
       - main
       - dev
+  pull_request:
+    branches:
+      - main
+      - dev
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-      - run: pip install poetry
-      - run: poetry install
-      - run: poetry run pytest
+          python-version: '3.11'  # Use the same version as your local environment
+
+      # Install Poetry
+      - name: Install Poetry
+        run: pip install poetry
+
+      # Install Dependencies
+      - name: Install Dependencies
+        run: poetry install
+
+      # Run Tests
+      - name: Run Tests
+        run: poetry run pytest
+
