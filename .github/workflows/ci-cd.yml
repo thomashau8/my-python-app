@@ -30,6 +30,10 @@ jobs:
       - name: Install Poetry
         run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
 
+      # Install Dependencies
+      - name: Install Dependencies
+        run: poetry install
+
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
 
@@ -69,10 +73,6 @@ jobs:
       - name: Cleanup Corrupt .venv
         if: failure()
         run: rm -rf .venv
-
-      # Install Dependencies
-      - name: Install Dependencies
-        run: poetry install
 
       - name: Install 'Ruff'
         run: poetry add ruff --dev
