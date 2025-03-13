@@ -41,6 +41,9 @@ jobs:
       - name: Run Migrations
         run: poetry run python config/manage.py migrate
 
+      - name: Force `.venv` in Project Root
+        run: poetry config virtualenvs.in-project true
+
       # Cache Poetry Dependencies (Plan B)
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
@@ -58,6 +61,11 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             venv-${{ runner.os }}-
+
+      # Add cleanup to remove broken .venv (Optional)
+      - name: Cleanup Corrupt .venv
+        if: failure()
+        run: rm -rf .venv
 
       - name: Debug Environment
         run: |
