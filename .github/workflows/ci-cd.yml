@@ -20,7 +20,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'  # Use the same version as your local environment
+          python-version: '3.12'  # Use the same version as your local environment
 
       # Install Poetry
       - name: Install Poetry
@@ -29,6 +29,9 @@ jobs:
       # Install Dependencies
       - name: Install Dependencies
         run: poetry install
+
+      - name: Run Migrations
+        run: poetry run python manage.py migrate
 
       # Run Tests
       - name: Run Tests

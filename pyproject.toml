@@ -3,14 +3,16 @@ name = "my-python-app"
 version = "0.1.0"
 description = "A simple Python app for CI/CD testing"
 authors = ["Your Name <your.email@example.com>"]
-packages = [{ include = "my_project" }]  # <--- Add this line
+packages = [{ include = "my_project" }, { include = "config" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+django = "^5.1.7"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 pytest-cov = "^6.0.0"
+pytest-django ="^4.7.0"
 
 [build-system]
 requires = ["poetry-core"]
