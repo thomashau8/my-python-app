@@ -10,6 +10,10 @@ on:
       - main
       - dev
 
+env:
+  PYTHON_VERSION: "3.12"
+  POETRY_VERSION: "2.0.1"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -20,11 +24,11 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'  # Use the same version as your local environment
+          python-version: ${{ env.PYTHON_VERSION }}
 
       # Install Poetry
       - name: Install Poetry
-        run: pip install poetry
+        run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
 
       # Install Dependencies
       - name: Install Dependencies
@@ -36,6 +40,24 @@ jobs:
 
       - name: Run Migrations
         run: poetry run python config/manage.py migrate
+
+      # Cache Poetry Dependencies (Plan B)
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+            
+      # Cache .venv for Fastest Installs (Best Plan)
+      - name: Cache .venv
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
 
       - name: Debug Environment
         run: |
@@ -49,6 +71,6 @@ jobs:
 
 
       # Run Tests
-      - name: Run Tests
+      - name: Run Tests with Coverage
         run: poetry run pytest
 
