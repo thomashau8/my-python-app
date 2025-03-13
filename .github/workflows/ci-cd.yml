@@ -30,8 +30,23 @@ jobs:
       - name: Install Dependencies
         run: poetry install
 
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
+
+
       - name: Run Migrations
         run: poetry run python config/manage.py migrate
+
+      - name: Debug Environment
+        run: |
+          echo "PYTHONPATH=$PYTHONPATH"
+          echo "DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE"
+          ls -R
+          
+      - name: Debug Python Path
+        run: |
+          python -c "import sys; print(sys.path)"  
+
 
       # Run Tests
       - name: Run Tests
