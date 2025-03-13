@@ -30,13 +30,8 @@ jobs:
       - name: Install Poetry
         run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
 
-
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
-
-
-      - name: Run Migrations
-        run: poetry run python config/manage.py migrate
 
       - name: Force `.venv` in Project Root
         run: |
@@ -46,11 +41,11 @@ jobs:
       - name: Get `.venv` Path
         run: echo "VENV_PATH=$(poetry env info --path)" >> $GITHUB_ENV
 
-
-
       - name: Confirm `.venv` Path
         run: poetry env info
 
+      - name: Run Migrations
+        run: poetry run python config/manage.py migrate
 
       # Cache Poetry Dependencies (Plan B)
       - name: Cache Poetry dependencies
