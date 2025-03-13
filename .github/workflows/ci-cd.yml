@@ -42,11 +42,22 @@ jobs:
         run: poetry run python config/manage.py migrate
 
       - name: Force `.venv` in Project Root
-        run: poetry config virtualenvs.in-project true
+        run: |
+          poetry config virtualenvs.in-project true --local
+          poetry config virtualenvs.in-project true
+
+      - name: Get `.venv` Path
+        run: echo "VENV_PATH=$(poetry env info --path)" >> $GITHUB_ENV
+
+
+
+      - name: Confirm `.venv` Path
+        run: poetry env info
+
 
       # Cache Poetry Dependencies (Plan B)
       - name: Cache Poetry dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4.2.2
         with:
           path: ~/.cache/pypoetry
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
@@ -57,7 +68,7 @@ jobs:
       - name: Cache .venv
         uses: actions/cache@v3
         with:
-          path: .venv
+          path: ${{ env.VENV_PATH }}
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             venv-${{ runner.os }}-
