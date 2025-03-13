@@ -31,7 +31,7 @@ jobs:
         run: poetry install
 
       - name: Run Migrations
-        run: poetry run python manage.py migrate
+        run: poetry run python config/manage.py migrate
 
       # Run Tests
       - name: Run Tests
