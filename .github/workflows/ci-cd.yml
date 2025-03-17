@@ -50,6 +50,9 @@ jobs:
       - name: Configure Poetry to use in-project venv
         run: poetry config virtualenvs.in-project true
 
+      - name: Force Poetry to Use In-Project Virtualenv
+        run: echo "POETRY_VIRTUALENVS_IN_PROJECT=true" >> $GITHUB_ENV
+
       # Install dependencies only if they weren't cached (creates/updates .venv)
       - name: Install dependencies (if cache missed)
         if: steps.venv-cache.outputs.cache-hit != 'true'
