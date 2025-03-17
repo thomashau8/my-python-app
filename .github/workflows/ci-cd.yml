@@ -69,7 +69,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: venv
-          path: ${{ env.VENV_PATH }}
+          path: /home/runner/work/my-python-app/my-python-app/.venv
 
   lint:
     runs-on: ubuntu-latest
