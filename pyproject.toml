@@ -8,6 +8,7 @@ packages = [{ include = "my_project" }, { include = "config" }]
 [tool.poetry.dependencies]
 python = "^3.11"
 django = "^5.1.7"
+gunicorn = "^23.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
