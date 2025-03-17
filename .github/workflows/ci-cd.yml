@@ -13,6 +13,7 @@ on:
 env:
   PYTHON_VERSION: "3.12"
   POETRY_VERSION: "2.0.1"
+  VENV_PATH: ${{ github.workspace }}/.venv
 
 jobs:
   setup:
@@ -69,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: venv
-          path: /home/runner/work/my-python-app/my-python-app/.venv
+          path: ${{ env.VENV_PATH }}
 
   lint:
     runs-on: ubuntu-latest
@@ -89,7 +90,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: venv
-          path: .           # Extract to workspace, restoring .venv folder
+          path: ${{ env.VENV_PATH }}
 
       # Add Poetry to PATH in this job
       - name: Add Poetry to PATH
@@ -113,7 +114,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: venv
-          path: .
+          path: ${{ env.VENV_PATH }}
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Run tests
