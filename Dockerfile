@@ -25,7 +25,7 @@ RUN poetry install --no-interaction --verbose --no-root
 # Copy the rest of your source code
 COPY . .
 
-RUN poetry run python config/manage.py collectstatic --noinput
+RUN poetry run python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
