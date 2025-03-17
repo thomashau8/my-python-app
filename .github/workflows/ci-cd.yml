@@ -105,7 +105,7 @@ jobs:
         run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
 
       - name: Run Migrations
-        run: poetry run python config/manage.py migrate
+        run: poetry run python manage.py migrate
 
       - name: Run Tests with Coverage
         run: poetry run pytest --cov=my_project --cov-report=term --cov-report=html
