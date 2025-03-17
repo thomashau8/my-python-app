@@ -31,9 +31,6 @@ jobs:
       - name: Install Poetry
         run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
 
-      - name: Add Poetry to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
       - name: Force `.venv` in Project Root
         run: |
           poetry config virtualenvs.in-project true --local
@@ -94,6 +91,9 @@ jobs:
 
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
+
+      - name: Add Poetry to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Run Migrations
         run: poetry run python config/manage.py migrate
