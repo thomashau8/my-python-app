@@ -41,13 +41,13 @@ jobs:
 
       - name: Get `.venv` Path
         id: get_venv
-        run: echo "::set-output name=VENV_PATH::$(poetry env info --path)"
+        run: echo "VENV_PATH=$(poetry env info --path)" >> $GITHUB_ENV
 
       # Cache Poetry Dependencies (Plan B)
       - name: Cache Poetry dependencies
         uses: actions/cache@v4.2.2
         with:
-          path: ~/.cache/pypoetry
+          path: ${{ env.VENV_PATH }}
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
