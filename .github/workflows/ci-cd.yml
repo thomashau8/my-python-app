@@ -146,7 +146,7 @@ jobs:
   build_production:
     name: Build Production Docker Image
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, lint, build]
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
