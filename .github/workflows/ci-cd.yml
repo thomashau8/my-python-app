@@ -92,6 +92,8 @@ jobs:
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
 
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
