@@ -1,5 +1,12 @@
 name: CI/CD Pipeline
 
+permissions:
+  contents: read        # Required to read repository content.
+  actions: read         # Allows actions to read data.
+  packages: write       # Required for pushing packages/images.
+  checks: write         # Sometimes needed for uploading reports.
+
+
 on:
   push:
     branches:
