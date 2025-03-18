@@ -52,7 +52,7 @@ jobs:
 
       - name: Install Dependencies (if cache missed)
         if: steps.venv-cache.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --no-root
 
       - name: Debug .venv Existence
         run: ls -la .venv || echo "No .venv found"
