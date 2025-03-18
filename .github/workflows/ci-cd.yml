@@ -165,7 +165,7 @@ jobs:
           output: report.json
 
       - name: Upload Anchore Scan Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: anchore-scan-report
           path: report.json
