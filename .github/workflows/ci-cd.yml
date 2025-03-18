@@ -147,10 +147,16 @@ jobs:
           push: true
           tags: docker.io/thomashau8/my-python-app:${{ github.sha }}-production
 
-      - name: Scan Image
+  container_scan:
+    name: Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: build_production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Scan Image with Anchore
         uses: anchore/scan-action@v6
         with:
           image: docker.io/thomashau8/my-python-app:${{ github.sha }}-production
-          # Change severity cutoff if wanted
-          #fail-build: true
-          #severity-cutoff: "value"
+          fail-build: true
