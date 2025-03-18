@@ -44,6 +44,15 @@ jobs:
         if: steps.poetry-cache.outputs.cache-hit != 'true'
         run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
 
+      - name: Configure Poetry custom settings
+        run: |
+          mkdir -p ~/.config/pypoetry
+          echo "[repositories]" > ~/.config/pypoetry/config.toml
+          echo "custom = \"https://my.custom.repo\"" >> ~/.config/pypoetry/config.toml
+
+      - name: Disable virtualenv creation
+        run: poetry config virtualenvs.create false
+
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
