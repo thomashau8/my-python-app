@@ -160,9 +160,6 @@ jobs:
         with:
           image: docker.io/thomashau8/my-python-app:${{ github.sha }}-production
           fail-build: true
-          format: template
-          template: "@/contrib/gitlab.tpl"
-          output: report.json
 
       - name: Upload Anchore Scan Report
         uses: actions/upload-artifact@v4
