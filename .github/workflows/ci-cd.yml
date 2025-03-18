@@ -53,6 +53,9 @@ jobs:
       - name: Disable virtualenv creation
         run: poetry config virtualenvs.create false
 
+      - name: Configure Poetry to use in-project venv
+        run: poetry config virtualenvs.in-project true
+
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
