@@ -20,7 +20,7 @@ RUN poetry config virtualenvs.create false
 COPY pyproject.toml poetry.lock* my_project/ ./
 
 # Now run Poetry install (which will install your project too)
-RUN poetry install --no-interaction --verbose --no-root
+RUN poetry install --no-interaction --verbose
 
 # Copy the rest of your source code
 COPY . .
