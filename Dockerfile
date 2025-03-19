@@ -1,32 +1,40 @@
-FROM python:3.12-slim
+# Stage 1: Build stage using the Python base image
+FROM myrepo/python-base:latest AS builder
+WORKDIR /app
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# Copy dependency files first for caching
+COPY pyproject.toml poetry.lock* ./
 
-WORKDIR /
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y build-essential libpq-dev curl
-
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -
-ENV PATH="/root/.local/bin:${PATH}"
-
-# Configure Poetry to not create a virtualenv (optional for containers)
+# Disable Poetry’s virtualenv creation so it installs into the current environment.
 RUN poetry config virtualenvs.create false
 
-# Copy dependency definitions AND your package folder
-COPY pyproject.toml poetry.lock* my_project/ ./
-
-# Now run Poetry install (which will install your project too)
+# Install dependencies (using --no-root to avoid packaging your project)
 RUN poetry install --no-interaction --no-ansi --no-root
 
-# Copy the rest of your source code
+# Copy the rest of your source code.
 COPY . .
 
+# (Optional) Compile Python code to catch errors early.
+RUN poetry run python -m compileall .
+
+# Collect static files (if using Django)
 RUN poetry run python manage.py collectstatic --noinput
 
+# Stage 2: Production stage – use the same Python base image
+FROM myrepo/python-base:latest AS production
+WORKDIR /app
+
+# Copy built app from builder stage
+COPY --from=builder /app /app
+
+# Set up a non-root user for security
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+# Switch to the non-root user
+USER appuser
+
+# Expose the port your application uses
 EXPOSE 8000
 
+# Command to start the app (adjust according to your project)
 CMD ["poetry", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
