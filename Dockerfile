@@ -1,40 +1,46 @@
 # Stage 1: Build stage using the Python base image
-FROM docker.io/thomashau8/python-base:latest AS builder
+FROM python:3.12-slim AS builder
 WORKDIR /app
 
-# Copy dependency files first for caching
-COPY pyproject.toml poetry.lock* ./
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential \
+      libpq-dev \
+      curl && \
+    rm -rf /var/lib/apt/lists/*
 
-# Disable Poetry’s virtualenv creation so it installs into the current environment.
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Configure Poetry: disable automatic virtualenv creation
 RUN poetry config virtualenvs.create false
 
-# Install dependencies (using --no-root to avoid packaging your project)
+# Copy dependency files first to leverage Docker cache
+COPY pyproject.toml poetry.lock* ./
+
+# Install dependencies (using --no-root so that your project isn't packaged)
 RUN poetry install --no-interaction --no-ansi --no-root
 
-# Copy the rest of your source code.
+# Copy the rest of your source code
 COPY . .
 
-# (Optional) Compile Python code to catch errors early.
+# Compile Python files to catch syntax errors early
 RUN poetry run python -m compileall .
 
-# Collect static files (if using Django)
+# Collect Django static files
 RUN poetry run python manage.py collectstatic --noinput
 
-# Stage 2: Production stage – use the same Python base image
+# Stage 2: Production Stage – Use the built application from the builder stage
 FROM builder AS production
 WORKDIR /app
 
-# Copy built app from builder stage
-COPY --from=builder /app /app
-
-# Set up a non-root user for security
+# Create a non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-
-# Switch to the non-root user
 USER appuser
 
-# Expose the port your application uses
+# Expose the port that your application listens on
 EXPOSE 8000
 
-# Command to start the app (adjust according to your project)
+# Set the command to run your application (using Gunicorn for example)
 CMD ["poetry", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
