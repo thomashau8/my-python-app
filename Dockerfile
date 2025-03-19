@@ -21,7 +21,7 @@ RUN poetry run python -m compileall .
 RUN poetry run python manage.py collectstatic --noinput
 
 # Stage 2: Production stage – use the same Python base image
-FROM docker.io/thomashau8/python-base:latest AS production
+FROM builder AS production
 WORKDIR /app
 
 # Copy built app from builder stage
