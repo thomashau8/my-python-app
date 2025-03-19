@@ -1,5 +1,5 @@
 # Stage 1: Build stage using the Python base image
-FROM myrepo/python-base:latest AS builder
+FROM docker.io/thomashau8/python-base:latest AS builder
 WORKDIR /app
 
 # Copy dependency files first for caching
