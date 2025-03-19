@@ -83,7 +83,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./.github/images/python
-          file: dockerfile1.0
+          file: Dockerfile
           push: true
           tags: docker.io/thomashau8/python-base:latest
 
