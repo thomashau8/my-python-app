@@ -63,30 +63,6 @@ jobs:
       - name: Debug .venv Existence
         run: ls -la .venv || echo "No .venv found"
 
-  build_base:
-    name: Build and Push Base Image
-    runs-on: ubuntu-latest
-    outputs:
-      base_image: ${{ steps.push.outputs.image_tag }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Login to Docker Registry
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.USERNAME }}
-          password: ${{ secrets.SECRET_PASSWORD }}
-
-      - name: Build and Push Base Image
-        id: push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./.github/images/python
-          file: Dockerfile
-          push: true
-          tags: docker.io/thomashau8/python-base:latest
-
   lint:
     runs-on: ubuntu-latest
     needs: setup
@@ -176,6 +152,8 @@ jobs:
           file: Dockerfile
           push: true
           tags: docker.io/thomashau8/my-python-app:${{ github.sha }}-production
+          cache-from: type=registry,ref=docker.io/thomashau8/my-python-app:cache
+          cache-to: type=registry,ref=docker.io/thomashau8/my-python-app:cache,mode=max
 
   container_scan:
     name: Scan Docker Image
