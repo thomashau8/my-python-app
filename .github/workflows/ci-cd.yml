@@ -119,6 +119,9 @@ jobs:
           chmod +x $HOME/.local/bin/poetry
           chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
 
+      - name: Fix venv permissions
+        run: chmod -R +x ${{ github.workspace }}/.venv/bin
+
       # Check for leaked secrets
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
