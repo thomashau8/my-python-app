@@ -69,22 +69,22 @@ jobs:
 
       - name: Explicitly move cached files into workspace
         run: |
-          mkdir -p ${{ github.workspace }}/.venv
-          mkdir -p ${{ github.workspace }}/.local
-          cp -r ~/.local/* ${{ github.workspace }}/.local/ || true
-          cp -r .venv/* ${{ github.workspace }}/.venv/ || true
+          mkdir -p ${{ github.workspace }}/venv_artifact
+          mkdir -p ${{ github.workspace }}/local_artifact
+          cp -r ~/.local ${{ github.workspace }}/local_artifact/ || true
+          cp -r .venv ${{ github.workspace }}/venv_artifact/ || true
 
       - name: Upload .venv artifact
         uses: actions/upload-artifact@v4
         with:
           name: venv-artifact
-          path: ${{ github.workspace }}/.venv
+          path: ${{ github.workspace }}/venv_artifact
 
       - name: Upload poetry cache artifact
         uses: actions/upload-artifact@v4
         with:
           name: poetry-cache-artifact
-          path: ${{ github.workspace }}/.local
+          path: ${{ github.workspace }}/local_artifact
 
   security_checks:
     needs: setup
