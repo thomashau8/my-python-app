@@ -1,0 +1,6 @@
+version: 2
+updates:
+  - package-ecosystem: "poetry"
+    directory: "/"
+    schedule:
+      interval: "weekly"  # Set this to daily, weekly, or monthly
