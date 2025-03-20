@@ -58,10 +58,54 @@ jobs:
 
       - name: Install Dependencies (if cache missed)
         if: steps.venv-cache.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --no-ansi --no-root
 
-      - name: Debug .venv Existence
-        run: ls -la .venv || echo "No .venv found"
+      - name: Create setup artifact (.venv and poetry cache)
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-artifact
+          path: |
+            .venv
+            ~/.local
+
+  security_checks:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checksout code
+      - uses: actions/checkout@v4
+
+      - name: Download setup artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-artifact
+          path: .
+
+      - name: Add Poetry to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Check for leaked secrets
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Check Python code vulnerabilities
+      - name: Run Bandit security analysis
+        run: |
+          poetry install --no-root --no-interaction
+          poetry run bandit -r ./my_project
+
+      # Check dependency vulnerabilities
+      - name: Run Poetry Audit
+        run: poetry audit
+
+      # Check Dockerfile best practices
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
 
   lint:
     runs-on: ubuntu-latest
@@ -70,21 +114,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Restore Poetry cache
-        uses: actions/cache@v4
+      - name: Download setup artifact
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.local
-          key: poetry-${{ runner.os }}-1.4.2
-
-      - name: Download .venv from cache (if available)
-        # Here we rely on the cache restored by the setup job
-        run: ls -la ${{ env.VENV_PATH }}
+          name: setup-artifact
+          path: .
 
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install Dependencies
-        run: poetry install
 
       - name: Run Pre-Commit Hooks
         run: poetry run pre-commit run --all-files
@@ -96,17 +134,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Restore Poetry cache
-        uses: actions/cache@v4
+      - name: Download setup artifact
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.local
-          key: poetry-${{ runner.os }}-1.4.2
+          name: setup-artifact
+          path: .
 
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install Dependencies
-        run: poetry install
 
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
@@ -156,24 +191,15 @@ jobs:
           cache-to: type=registry,ref=docker.io/thomashau8/my-python-app:cache,mode=max
 
   container_scan:
-    name: Scan Docker Image
-    runs-on: ubuntu-latest
-    needs: build_production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'docker.io/thomashau8/my-python-app:${{ github.sha }}-production'
+        severity: 'CRITICAL,HIGH'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
 
-      - name: Scan Image with Anchore
-        id: scan
-        uses: anchore/scan-action@v6
-        with:
-          image: docker.io/thomashau8/my-python-app:${{ github.sha }}-production
-          fail-build: false
-
-      - name: upload Anchore scan SARIF report
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
-
-      - name: Inspect action SARIF report
-        run: cat ${{ steps.scan.outputs.sarif }}
+    - name: Upload Trivy SARIF report
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
