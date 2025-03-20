@@ -75,8 +75,8 @@ jobs:
         with:
           name: setup-artifact
           path: |
-            .venv/**
-            /home/runner/.local/**
+            .venv
+            ~/.local
   
 
   security_checks:
