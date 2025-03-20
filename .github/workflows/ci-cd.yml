@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-      - uses: actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: Download setup artifact
         uses: actions/download-artifact@v4
@@ -193,7 +193,7 @@ jobs:
   container_scan:
     name: Container scan
     runs-on: ubuntu-latest
-    needs: build_protection
+    needs: build_production
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
