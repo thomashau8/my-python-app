@@ -90,7 +90,6 @@ jobs:
         with:
           name: poetry-cache-artifact
           path: ${{ github.workspace }}/local_artifact
-          
 
 
   security_checks:
@@ -111,6 +110,9 @@ jobs:
         with:
           name: poetry-cache-artifact
           path: /home/runner/.local
+
+      - name: Fix Poetry permissions
+        run: chmod +x $HOME/.local/bin/poetry
 
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
