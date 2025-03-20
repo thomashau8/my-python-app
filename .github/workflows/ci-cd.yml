@@ -56,19 +56,16 @@ jobs:
       - name: Configure Poetry to use in-project venv
         run: poetry config virtualenvs.in-project true
 
+      - name: Verify actual directories content
+        run: |
+          echo "Actual contents of .venv:"
+          ls -la .venv
+          echo "Actual contents of ~/.local:"
+          ls -la ~/.local
+
       - name: Install Dependencies (if cache missed)
         if: steps.venv-cache.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-ansi --no-root
-
-      - name: Ensure artifact directories exist
-        run: |
-          mkdir -p .venv
-          mkdir -p ~/.local
-          # Verify contents explicitly for debugging
-          echo "Contents of .venv:"
-          ls -la .venv
-          echo "Contents of ~/.local:"
-          ls -la ~/.local
 
       - name: Upload .venv artifact
         uses: actions/upload-artifact@v4
