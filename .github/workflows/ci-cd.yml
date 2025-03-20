@@ -111,11 +111,13 @@ jobs:
           name: poetry-cache-artifact
           path: /home/runner/.local
 
-      - name: Fix Poetry permissions
-        run: chmod +x $HOME/.local/bin/poetry
-
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Fix Poetry permissions
+        run: |
+          chmod +x $HOME/.local/bin/poetry
+          chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
 
       # Check for leaked secrets
       - name: Run Gitleaks
