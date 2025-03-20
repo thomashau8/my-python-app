@@ -66,7 +66,7 @@ jobs:
           name: setup-artifact
           path: |
             .venv
-            ~/.local
+            /home/runner/.local
 
   security_checks:
     needs: setup
@@ -161,7 +161,7 @@ jobs:
   build_production:
     name: Build Production Docker Image
     runs-on: ubuntu-latest
-    needs: [ test, lint ]
+    needs: [ test, lint, security_checks ]
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
