@@ -13,19 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN bash -o pipefail -c "curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -"
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Configure Poetry: disable automatic virtualenv creation
-RUN poetry config virtualenvs.create false
-
-# Copy dependency files first to leverage Docker cache
+# Copy dependency files and install dependencies
 COPY pyproject.toml poetry.lock* ./
+RUN poetry install --no-interaction --no-ansi --no-root
 
 # Install dependencies (using --no-root so that your project isn't packaged)
 RUN poetry install --no-interaction --no-ansi --no-root
 
-# Copy the rest of your source code
+# Copy the rest of the source code and build your application
 COPY . .
-
-# Compile Python files to catch syntax errors early
 RUN poetry run python -m compileall . && \
     poetry run python manage.py collectstatic --noinput
 
@@ -37,9 +33,6 @@ WORKDIR /app
 # Create a non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
-
-# Expose the port that your application listens on
-EXPOSE 8000
 
 # Set the command to run your application (using Gunicorn for example)
 CMD ["poetry", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
