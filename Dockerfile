@@ -4,9 +4,9 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential \
-      libpq-dev \
-      curl && \
+      build-essential=12.9 \
+      libpq-dev=15.12-0+deb12u2 \
+      curl=7.88.1-10+deb12u12 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Poetry

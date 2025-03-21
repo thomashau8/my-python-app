@@ -56,20 +56,12 @@ jobs:
       - name: Configure Poetry to use in-project venv
         run: poetry config virtualenvs.in-project true
 
-      - name: Verify actual directories content
-        run: |
-          echo "Actual contents of .venv:"
-          ls -la .venv
-          echo "Actual contents of ~/.local:"
-          ls -la ~/.local
-
       - name: Install Dependencies (if cache missed)
         if: steps.venv-cache.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-ansi --no-root
 
       - name: Prepare artifact directories
         run: |
-         # Create non-hidden directories in the workspace
           mkdir -p ${{ github.workspace }}/venv_artifact
           mkdir -p ${{ github.workspace }}/local_artifact
 
