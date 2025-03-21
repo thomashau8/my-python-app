@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-RUN curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -
+RUN bash -o pipefail -c "curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -"
 ENV PATH="/root/.local/bin:${PATH}"
 
 # Configure Poetry: disable automatic virtualenv creation
@@ -26,10 +26,9 @@ RUN poetry install --no-interaction --no-ansi --no-root
 COPY . .
 
 # Compile Python files to catch syntax errors early
-RUN poetry run python -m compileall .
+RUN poetry run python -m compileall . && \
+    poetry run python manage.py collectstatic --noinput
 
-# Collect Django static files
-RUN poetry run python manage.py collectstatic --noinput
 
 # Stage 2: Production Stage – Use the built application from the builder stage
 FROM builder AS production

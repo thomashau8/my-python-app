@@ -160,9 +160,16 @@ jobs:
           name: poetry-cache-artifact
           path: /home/runner/.local
 
+      - name: Fix Poetry permissions
+        run: |
+          chmod +x $HOME/.local/bin/poetry
+          chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
+
+      - name: Fix venv permissions
+        run: chmod -R +x ${{ github.workspace }}/.venv/bin
+
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
 
       - name: Run Pre-Commit Hooks
         run: poetry run pre-commit run --all-files
@@ -185,6 +192,14 @@ jobs:
         with:
           name: poetry-cache-artifact
           path: /home/runner/.local
+
+      - name: Fix Poetry permissions
+        run: |
+          chmod +x $HOME/.local/bin/poetry
+          chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
+
+      - name: Fix venv permissions
+        run: chmod -R +x ${{ github.workspace }}/.venv/bin
 
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
