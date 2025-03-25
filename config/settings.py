@@ -27,7 +27,8 @@ SECRET_KEY = "django-insecure-cy*-r+tg8z97q3cnfq0mj_7z&dp__^_40)+7hjndk27p@!%emw
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "testing-container.yellowisland-63e42240.westeurope.azurecontainerapps.io"
+    "testing-container.yellowisland-63e42240.westeurope.azurecontainerapps.io,"
+    "testing-container--bnlwugn.yellowisland-63e42240.westeurope.azurecontainerapps.io"
 ]
 
 
