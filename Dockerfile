@@ -26,6 +26,7 @@ RUN poetry install --no-interaction --no-ansi --no-root
 COPY . .
 
 # Compile Python files to catch syntax errors early
+#testing
 RUN poetry run python -m compileall . && \
     poetry run python manage.py collectstatic --noinput
 
