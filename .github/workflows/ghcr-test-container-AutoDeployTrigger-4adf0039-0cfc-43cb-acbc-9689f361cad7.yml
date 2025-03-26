@@ -41,7 +41,7 @@ jobs:
           registryPassword: ${{ secrets.GHCRTESTCONTAINER_REGISTRY_PASSWORD }}
           containerAppName: ghcr-test-container
           resourceGroup: testEnv
-          imageToBuild: ghcr.io/ghcr-test-container:${{ github.sha }}
+          imageToBuild: ghcr.io/thomashau8/my-python-app:${{ github.sha }}
           _buildArgumentsKey_: |
             _buildArgumentsValues_
 
