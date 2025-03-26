@@ -293,5 +293,5 @@ jobs:
           resourceGroup: test-env
           imageToDeploy: ghcr.io/${{ github.repository }}:${{ github.sha }}
           registryUrl: ghcr.io
-          registryUsername: ${{ github.actor }}
-          registryPassword: ${{ secrets.PACKAGE_SECRET }}
+          registryUsername: ${{ secrets.GHCRTESTCONTAINER_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.GHCRTESTCONTAINER_REGISTRY_PASSWORD }}
