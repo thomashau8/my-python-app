@@ -290,7 +290,7 @@ jobs:
         uses: azure/container-apps-deploy-action@v2
         with:
           containerAppName: ghcr-test-container
-          resourceGroup: test-env
+          resourceGroup: testEnv
           imageToDeploy: ghcr.io/${{ github.repository }}:${{ github.sha }}
           registryUrl: ghcr.io
           registryUsername: ${{ secrets.GHCRTESTCONTAINER_REGISTRY_USERNAME }}
