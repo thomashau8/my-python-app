@@ -277,7 +277,7 @@ jobs:
   deploy_to_azure:
     name: Deploy to Azure Container App
     runs-on: ubuntu-latest
-    needs: container_scan
+    needs: review
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
