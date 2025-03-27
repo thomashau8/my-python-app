@@ -137,7 +137,7 @@ jobs:
     needs: setup
     steps:
       - name: Run Common Setup
-        uses: .github/actions/setup-environment
+        uses: ./.github/actions/setup-environment
         with:
           venvArtifactName: 'venv-artifact'
           poetryCacheArtifactName: 'poetry-cache-artifact'
