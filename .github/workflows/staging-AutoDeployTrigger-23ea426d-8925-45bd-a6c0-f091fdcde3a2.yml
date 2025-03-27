@@ -1,0 +1,48 @@
+name: Trigger auto deployment for staging
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ staging ]
+    paths:
+    - '**'
+    - '.github/workflows/staging-AutoDeployTrigger-23ea426d-8925-45bd-a6c0-f091fdcde3a2.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.STAGING_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.STAGING_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.STAGING_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          registryUrl: ghcr.io
+          registryUsername: ${{ secrets.STAGING_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.STAGING_REGISTRY_PASSWORD }}
+          containerAppName: staging
+          resourceGroup: testEnv
+          imageToBuild: ghcr.io/staging:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
