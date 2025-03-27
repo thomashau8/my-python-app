@@ -90,28 +90,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download .venv artifact
-        uses: actions/download-artifact@v4
+      - name: Run Common Setup
+        uses: ./.github/actions/setup-environment/
         with:
-          name: venv-artifact
-          path: ${{ github.workspace }}/.venv
-
-      - name: Download poetry cache artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: poetry-cache-artifact
-          path: /home/runner/.local
-
-      - name: Add Poetry to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Fix Poetry permissions
-        run: |
-          chmod +x $HOME/.local/bin/poetry
-          chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
-
-      - name: Fix venv permissions
-        run: chmod -R +x ${{ github.workspace }}/.venv/bin
+          venvArtifactName: 'venv-artifact'
+          poetryCacheArtifactName: 'poetry-cache-artifact'
 
       # Check for leaked secrets
       - name: Run Gitleaks
@@ -155,31 +138,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download .venv artifact
-        uses: actions/download-artifact@v4
+      - name: Run Common Setup
+        uses: ./.github/actions/setup-environment/
         with:
-          name: venv-artifact
-          path: ${{ github.workspace }}/.venv
-
-      - name: Download poetry cache artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: poetry-cache-artifact
-          path: /home/runner/.local
-
-      - name: Fix Poetry permissions
-        run: |
-          chmod +x $HOME/.local/bin/poetry
-          chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
-
-      - name: Fix venv permissions
-        run: chmod -R +x ${{ github.workspace }}/.venv/bin
-
-      - name: Add Poetry to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$PWD:$PWD/config" >> $GITHUB_ENV
+          venvArtifactName: 'venv-artifact'
+          poetryCacheArtifactName: 'poetry-cache-artifact'
 
       - name: Run Migrations
         run: poetry run python manage.py migrate
