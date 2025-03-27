@@ -45,8 +45,32 @@ jobs:
       - name: Configure Poetry
         run: poetry config virtualenvs.in-project true
 
-      - name: Install Dependencies
+      - name: Install Dependencies (if cache missed)
+        if: steps.venv-cache.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-ansi --no-root
+
+      - name: Prepare artifact directories
+        run: |
+          mkdir -p ${{ github.workspace }}/venv_artifact
+          mkdir -p ${{ github.workspace }}/local_artifact
+
+          # Copy the contents from .venv (assumed to be in the workspace already)
+          cp -r .venv/* ${{ github.workspace }}/venv_artifact/
+
+          # Copy the contents of ~/.local (from home) into the workspace
+          cp -r ~/.local/* ${{ github.workspace }}/local_artifact/
+
+      - name: Upload .venv artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: venv-artifact
+          path: ${{ github.workspace }}/venv_artifact
+
+      - name: Upload poetry cache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poetry-cache-artifact
+          path: ${{ github.workspace }}/local_artifact
 
   security_checks:
     needs: setup
@@ -123,7 +147,7 @@ jobs:
   build_and_push_staging_image:
     name: Build and Push Staging Docker Image
     runs-on: ubuntu-latest
-    needs: [ lint, test ]
+    needs: [ lint, test, security_checks ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
