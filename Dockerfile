@@ -19,14 +19,13 @@ RUN poetry config virtualenvs.create false
 # Copy dependency files first to leverage Docker cache
 COPY pyproject.toml poetry.lock* ./
 
-# Install dependencies (using --no-root so that your project isn't packaged)
+# Install dependencies
 RUN poetry install --no-interaction --no-ansi --no-root
 
 # Copy the rest of your source code
 COPY . .
 
 # Compile Python files to catch syntax errors early
-#testing
 RUN poetry run python -m compileall . && \
     poetry run python manage.py collectstatic --noinput
 
