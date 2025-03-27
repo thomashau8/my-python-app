@@ -7,7 +7,7 @@ permissions:
 on:
   push:
     branches:
-      - dev
+      - staging
       - 'feature/*'  # Do we use feature branches? (ask rune)
 
 env:
