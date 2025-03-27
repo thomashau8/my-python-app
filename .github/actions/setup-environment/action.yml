@@ -27,11 +27,14 @@ runs:
 
     - name: Add Poetry to PATH
       run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+      shell: bash
 
     - name: Fix Poetry permissions
       run: |
         chmod +x $HOME/.local/bin/poetry
         chmod -R +x $HOME/.local/share/pypoetry/venv/bin/
+      shell: bash
 
     - name: Fix virtual environment permissions
       run: chmod -R +x ${{ github.workspace }}/.venv/bin
+      shell: bash
