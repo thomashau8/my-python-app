@@ -136,8 +136,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Run Common Setup
-        uses: ./.github/actions/setup-environment
+        uses: ./.github/actions/setup-environment/
         with:
           venvArtifactName: 'venv-artifact'
           poetryCacheArtifactName: 'poetry-cache-artifact'
