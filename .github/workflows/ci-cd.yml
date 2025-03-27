@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local
-          key: poetry-${{ runner.os }}-1.4.2
+          key: poetry-${{ runner.os }}-${{ env.POETRY_VERSION }}
 
       # Restore cached virtual environment
       - name: Restore .venv cache
