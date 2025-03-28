@@ -31,8 +31,17 @@ RUN poetry run python -m compileall . && \
 
 
 # Stage 2: Production Stage – Use the built application from the builder stage
+#TODO optimize AS production(?)
 FROM builder AS production
 WORKDIR /app
+
+# Copy ONLY required runtime files from builder
+COPY --from=builder /app /app
+
+# Install only necessary runtime system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libpq5=15.12-0+deb12u2 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
