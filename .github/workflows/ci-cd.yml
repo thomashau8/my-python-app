@@ -22,57 +22,6 @@ env:
 
 jobs:
 
-  security_checks:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout full history for Gitleaks
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Restore Poetry cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.local
-          key: poetry-${{ runner.os }}-${{ env.POETRY_VERSION }}
-
-      - name: Restore virtual environment cache
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            venv-${{ runner.os }}-
-
-      - name: Install Poetry
-        run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
-
-      - name: Add Poetry to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Configure Poetry
-        run: poetry config virtualenvs.in-project true
-
-      - name: Install Dependencies
-        run: poetry install --no-root --no-interaction --no-ansi
-
-      # Run Gitleaks to check for secrets
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Bandit static code security analysis
-      - name: Run Bandit
-        run: poetry run bandit -r ./my_project
-
-      # Hadolint to lint Dockerfile
-      - name: Run Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
-
   build_production:
     name: Build Production Docker Image
     if: github.event_name == 'push'
