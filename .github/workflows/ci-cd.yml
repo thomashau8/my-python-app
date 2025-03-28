@@ -21,23 +21,23 @@ env:
   POETRY_VERSION: "2.0.1"
 
 jobs:
-  setup:
+
+  security_checks:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout full history for Gitleaks
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Restore Poetry cache
       - name: Restore Poetry cache
-        id: poetry-cache
         uses: actions/cache@v4
         with:
           path: ~/.local
           key: poetry-${{ runner.os }}-${{ env.POETRY_VERSION }}
 
-      # Restore cached virtual environment
-      - name: Restore .venv cache
-        id: venv-cache
+      - name: Restore virtual environment cache
         uses: actions/cache@v4
         with:
           path: .venv
@@ -45,122 +45,39 @@ jobs:
           restore-keys: |
             venv-${{ runner.os }}-
 
-      - name: Install Poetry (if not cached)
-        if: steps.poetry-cache.outputs.cache-hit != 'true'
+      - name: Install Poetry
         run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
 
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Configure Poetry to use in-project venv
+      - name: Configure Poetry
         run: poetry config virtualenvs.in-project true
 
-      - name: Install Dependencies (if cache missed)
-        if: steps.venv-cache.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-ansi --no-root
+      - name: Install Dependencies
+        run: poetry install --no-root --no-interaction --no-ansi
 
-      - name: Prepare artifact directories
-        run: |
-          mkdir -p ${{ github.workspace }}/venv_artifact
-          mkdir -p ${{ github.workspace }}/local_artifact
-
-          # Copy the contents from .venv (assumed to be in the workspace already)
-          cp -r .venv/* ${{ github.workspace }}/venv_artifact/
-
-          # Copy the contents of ~/.local (from home) into the workspace
-          cp -r ~/.local/* ${{ github.workspace }}/local_artifact/
-
-      - name: Upload .venv artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: venv-artifact
-          path: ${{ github.workspace }}/venv_artifact
-
-      - name: Upload poetry cache artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: poetry-cache-artifact
-          path: ${{ github.workspace }}/local_artifact
-
-
-  security_checks:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
-        with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      # Check for leaked secrets
+      # Run Gitleaks to check for secrets
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Check Python code vulnerabilities
-      - name: Run Bandit security analysis
-        run: |
-          poetry install --no-root --no-interaction
-          poetry run bandit -r ./my_project
+      # Bandit static code security analysis
+      - name: Run Bandit
+        run: poetry run bandit -r ./my_project
 
-      # Check Dockerfile best practices
+      # Hadolint to lint Dockerfile
       - name: Run Hadolint
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
 
-
-  lint:
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
-        with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      - name: Run Pre-Commit Hooks
-        run: poetry run pre-commit run --all-files
-
-  test:
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
-        with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      - name: Run Migrations
-        run: poetry run python manage.py migrate
-
-      - name: Run Tests with Coverage
-        run: poetry run pytest --cov=my_project --cov-report=term --cov-report=html
-
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: htmlcov/
-
   build_production:
     name: Build Production Docker Image
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: [ test, lint, security_checks ]
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -193,6 +110,7 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache,mode=max
 
   container_scan:
+    if: github.event_name == 'pull_request'
     name: Container scan
     runs-on: ubuntu-latest
     needs: build_production
@@ -212,6 +130,7 @@ jobs:
 
   review:
     name: Approval for Production
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: container_scan
     environment:
@@ -222,9 +141,9 @@ jobs:
 
   deploy_to_azure:
     name: Deploy to Azure Container App
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: review
-    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       id-token: write  # required for Azure authentication
@@ -233,7 +152,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Login to Azure using OIDC (recommended method)
+      # Login to Azure using OIDC
       - name: Azure Login
         uses: azure/login@v2
         with:

@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - dev
-      - 'feature/*'  # Do we use feature branches? (ask rune)
 
 env:
   PROJECT_NAME: "my-django-app"
@@ -45,39 +44,28 @@ jobs:
       - name: Configure Poetry
         run: poetry config virtualenvs.in-project true
 
-      - name: Install Dependencies
+      - name: Install Dependencies (if cache missed)
+        if: steps.venv-cache.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-ansi --no-root
 
-  security_checks:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
-        with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      # Check for leaked secrets
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Check Python code vulnerabilities
-      - name: Run Bandit security analysis
+      - name: Prepare artifact directories
         run: |
-          poetry install --no-root --no-interaction
-          poetry run bandit -r ./my_project
+          mkdir -p ${{ github.workspace }}/venv_artifact
+          mkdir -p ${{ github.workspace }}/local_artifact
+          cp -r .venv/* ${{ github.workspace }}/venv_artifact/
+          cp -r ~/.local/* ${{ github.workspace }}/local_artifact/
 
-      # Check Dockerfile best practices
-      - name: Run Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
+      - name: Upload .venv artifact
+        uses: actions/upload-artifact@v4
         with:
-          dockerfile: Dockerfile
+          name: venv-artifact
+          path: ${{ github.workspace }}/venv_artifact
+
+      - name: Upload poetry cache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poetry-cache-artifact
+          path: ${{ github.workspace }}/local_artifact
 
   lint:
     runs-on: ubuntu-latest
