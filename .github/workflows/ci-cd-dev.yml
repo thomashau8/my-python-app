@@ -6,9 +6,9 @@ permissions:
 
 on:
   push:
-    branches:
-      - staging
-      - 'feature/*'  # Do we use feature branches? (ask rune)
+    branches: [staging]
+  pull_request:
+    branches: [main]
 
 env:
   PROJECT_NAME: "my-django-app"
@@ -73,11 +73,14 @@ jobs:
           path: ${{ github.workspace }}/local_artifact
 
   security_checks:
+    if: github.event_name == 'pull_request'
     needs: setup
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Run Common Setup
         uses: ./.github/actions/setup-environment/
@@ -104,6 +107,7 @@ jobs:
           dockerfile: Dockerfile
 
   lint:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: setup
     steps:
@@ -120,6 +124,7 @@ jobs:
         run: poetry run pre-commit run --all-files
 
   test:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: setup
     steps:
@@ -147,7 +152,7 @@ jobs:
   build_and_push_staging_image:
     name: Build and Push Staging Docker Image
     runs-on: ubuntu-latest
-    needs: [ lint, test, security_checks ]
+    needs: [ lint, test ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
