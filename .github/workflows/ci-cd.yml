@@ -77,7 +77,6 @@ jobs:
     name: Build Production Docker Image
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: [ security_checks ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,7 +112,7 @@ jobs:
     if: github.event_name == 'pull_request'
     name: Container scan
     runs-on: ubuntu-latest
-    needs: [ security_checks, build_production ]
+    needs: [ build_production ]
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
