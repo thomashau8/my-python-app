@@ -3,7 +3,6 @@ name: Dev CI/CD Pipeline
 permissions:
   contents: read
   packages: write
-#test
 on:
   push:
     branches:
@@ -160,8 +159,8 @@ jobs:
       - name: Deploy to Azure Container Apps (Staging)
         uses: azure/container-apps-deploy-action@v2
         with:
-          containerAppName: your-staging-container-app
-          resourceGroup: your-staging-resource-group
+          containerAppName: staging
+          resourceGroup: testEnv
           imageToDeploy: ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
           registryUrl: ghcr.io
           registryUsername: ${{ secrets.GHCR_STAGING_REGISTRY_USERNAME }}
