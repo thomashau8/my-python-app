@@ -40,13 +40,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Login to Azure using OIDC - Using STAGING secrets as requested
-      - name: Azure Login via OIDC
+      # Login to Azure using OIDC
+      - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.STAGING_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.STAGING_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.STAGING_AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_SUBSCRIPTION_ID }}
 
       # Determine a unique, safe name for the container app based on the branch/PR
       - name: Set Dynamic Names
