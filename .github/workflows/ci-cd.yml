@@ -1,5 +1,5 @@
 name: CI/CD Pipeline
-
+#TODO fix permissions her
 permissions:
   contents: read        # Required to read repository content.
   actions: read         # Allows actions to read data.
