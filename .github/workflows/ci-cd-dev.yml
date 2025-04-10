@@ -208,5 +208,5 @@ jobs:
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Staging Deployment URL
-        run:
+        run: |
             echo "Staging App URL: ${{ steps.deploy.outputs.containerAppUrl }}"
