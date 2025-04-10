@@ -1,14 +1,12 @@
 name: Deploy Review Environment
 
-# Permissions required for OIDC, GHCR, and PR Comments
 permissions:
-  contents: read          # To checkout code
-  packages: write         # To push to GHCR
-  id-token: write         # Required for OIDC with Azure
-  pull-requests: write    # To comment on PRs
+  contents: read
+  packages: write
+  id-token: write
+  pull-requests: write
 
 on:
-  # Trigger on pushes to any branch *except* main and staging
   push:
     branches-ignore:
       - main
@@ -18,11 +16,11 @@ on:
     types: [opened, synchronize, reopened]
 
 env:
-  AZURE_RESOURCE_GROUP: testEnv
-  AZURE_LOCATION: westeurope
-  ACA_ENVIRONMENT_NAME: managedEnvironment-testEnv-9687
-  ACA_APP_NAME_PREFIX: review-app-                      # Prefix for dynamically created review apps
-  REGISTRY_NAME: ghcr.io                                # GitHub Container Registry
+  AZURE_RESOURCE_GROUP_REVIEW: rg_my_python_app_review
+  AZURE_LOCATION: norwayeast
+  ACA_ENVIRONMENT_NAME: review-env
+  ACA_APP_NAME_PREFIX: review-app-
+  REGISTRY_NAME: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   TARGET_PORT: 8000
 
@@ -44,19 +42,22 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID_REVIEW }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_REVIEW }}
 
       # Determine a unique, safe name for the container app based on the branch/PR
       - name: Set Dynamic Names
         id: names
         run: |
+          # Use head_ref for PRs, ref_name for direct branch pushes
           raw_ref="${{ github.head_ref || github.ref_name }}"
-          # Sanitize: lowercase, replace non-alphanumeric with '-', trim '-' edges, limit length to avoid exceeding Azure limits
+          # Sanitize: lowercase, replace non-alphanumeric with '-', trim '-' edges, limit length
+          # Keep it short enough so prefix + slug + potential hash don't exceed limits (ACA name limit is 32)
           branch_slug=$(echo "$raw_ref" | sed -e 's|[^a-zA-Z0-9]|-|g' | tr '[:upper:]' '[:lower:]' | sed -e 's/^-*//' -e 's/-*$//' | cut -c1-20)
-          # Ensure app name doesn't exceed max length (Container App names max length is 32)
+          # Ensure app name doesn't exceed max length (32 chars)
           app_name=$(echo "${{ env.ACA_APP_NAME_PREFIX }}${branch_slug}" | cut -c1-32)
+          # Always use commit SHA for unique image tag per deployment
           image_tag="${{ github.sha }}"
           full_image_name="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${image_tag}"
 
@@ -66,9 +67,9 @@ jobs:
           echo "Image Tag: ${image_tag}"
           echo "Full Image Name: ${full_image_name}"
 
-          # Export for subsequent steps
           echo "APP_NAME=${app_name}" >> $GITHUB_ENV
           echo "FULL_IMAGE_NAME=${full_image_name}" >> $GITHUB_ENV
+          echo "BRANCH_SLUG=${branch_slug}" >> $GITHUB_ENV # Also export slug if needed elsewhere
 
       # Login to GitHub Container Registry
       - name: Login to GHCR
@@ -76,7 +77,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY_NAME }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # Use the default GITHUB_TOKEN
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Set up Docker Buildx
       - name: Setup Docker Buildx
@@ -88,72 +89,53 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile # Ensure this path is correct
+          file: ./Dockerfile
           push: true
           tags: ${{ env.FULL_IMAGE_NAME }}
-          # Enable build cache for faster builds (uses GitHub Actions cache)
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       # Deploy or update the Container App in the EXISTING ACA environment
-      - name: Deploy to ACA (Existing Environment)
+      - name: Deploy to ACA Review Environment
+        id: deploy
         uses: azure/container-apps-deploy-action@v2
         with:
-          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}    # Should be testEnv
-          environmentName: ${{ env.ACA_ENVIRONMENT_NAME }}  # Target your EXISTING ACA environment
-          containerAppName: ${{ env.APP_NAME }}             # Deploy THIS specific DYNAMICALLY NAMED review app instance
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
+          environmentName: ${{ env.AZURE_ACA_ENVIRONMENT_REVIEW }}
+          containerAppName: ${{ env.APP_NAME }}
           imageToDeploy: ${{ steps.build-push.outputs.digest }} # Use specific digest
           registryUrl: ${{ env.REGISTRY_NAME }}
-          registryUsername: ${{ github.actor }}             # Use GitHub actor for GHCR auth
-          registryPassword: ${{ secrets.GITHUB_TOKEN }}     # Use GITHUB_TOKEN for GHCR auth
-          targetPort: ${{ env.TARGET_PORT }}                # Port your app listens on
-          ingress: external                                 # Make the app publicly accessible
+          registryUsername: ${{ github.actor }}
+          registryPassword: ${{ secrets.GITHUB_TOKEN }}
+          targetPort: ${{ env.TARGET_PORT }}
+          ingress: external
 
-      # Retrieve the FQDN (URL) of the deployed Container App
-      - name: Get ACA FQDN
-        id: get_url
-        run: |
-          echo "Fetching FQDN for app: ${{ env.APP_NAME }} in RG: ${{ env.AZURE_RESOURCE_GROUP }}"
-          # Add retries as ACA provisioning can take time
-          attempt=1
-          while [ $attempt -le 5 ]; do
-            fqdn=$(az containerapp show \
-              --name ${{ env.APP_NAME }} \
-              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --query properties.configuration.ingress.fqdn \
-              --output tsv 2>/dev/null) # Suppress errors during check
-
-            if [ -n "$fqdn" ]; then
-              echo "FQDN found: $fqdn"
-              break
-            fi
-
-            echo "Attempt $attempt: FQDN not found for ${{ env.APP_NAME }}. Waiting 30 seconds..."
-            sleep 30
-            attempt=$((attempt + 1))
-          done
-
-          if [ -z "$fqdn" ]; then
-            echo "::error::Could not retrieve FQDN for ${{ env.APP_NAME }} after multiple attempts."
-            echo "review_url=unknown" >> $GITHUB_OUTPUT
-          else
-            app_url="https://${fqdn}"
-            echo "App URL: ${app_url}"
-            echo "review_url=${app_url}" >> $GITHUB_OUTPUT
-          fi
-
-      # Comment on the Pull Request with the review environment URL (only for PR events)
       - name: Comment PR with Review URL
-        if: github.event_name == 'pull_request' && steps.get_url.outputs.review_url != 'unknown'
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.containerAppUrl != '' # Check if URL output exists
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          # Use a unique header/identifier for the comment for stickiness
           header: review-environment-deployment
           message: |
-            🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.ACA_ENVIRONMENT_NAME }}`)
+            🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.AZURE_ACA_ENVIRONMENT_REVIEW }}`)
 
             Branch: `${{ github.head_ref }}`
             App Name: `${{ env.APP_NAME }}`
             Commit: `${{ github.sha }}`
 
-            [Access Review App](${{ steps.get_url.outputs.review_url }})
+            ✅ **Deployment Successful!**
+
+            [Access Review App](${{ steps.deploy.outputs.containerAppUrl }})
+
+      # Handle deployment failure or missing URL
+      - name: Post Failure Comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: review-environment-deployment
+          message: |
+            ❌ **Review Environment Deployment Failed:**
+
+            Branch: `${{ github.head_ref }}`
+            Commit: `${{ github.sha }}`
+
+            Please check the [Actions logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.

@@ -1,8 +1,9 @@
-name: Dev CI/CD Pipeline
+name: Staging CI/CD Pipeline
 
 permissions:
   contents: read
   packages: write
+  id-token: write
 on:
   push:
     branches:
@@ -12,6 +13,11 @@ env:
   PROJECT_NAME: "my-django-app"
   PYTHON_VERSION: "3.12"
   POETRY_VERSION: "2.0.1"
+  AZURE_RESOURCE_GROUP_STAGING: rg_my_python_app_staging
+  AZURE_ACA_ENVIRONMENT_STAGING: managedEnvironment-rgmypythonappst-8ccb
+  AZURE_ACA_APP_NAME_STAGING: staging-container
+  REGISTRY_NAME: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   setup:
@@ -167,32 +173,40 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
-            ghcr.io/${{ github.repository }}:staging-latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:staging-cache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:staging-cache,mode=max
+            ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+            ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-latest
+          cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache
+          cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache,mode=max
 
   deploy_to_azure_staging:
     name: Deploy to Azure Staging
     runs-on: ubuntu-latest
     needs: build_and_push_staging_image
+    environment:
+      name: staging
     permissions:
       contents: read
       id-token: write
+
     steps:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.STAGING_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.STAGING_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.STAGING_AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Container Apps (Staging)
+        id: deploy
         uses: azure/container-apps-deploy-action@v2
         with:
-          containerAppName: staging
-          resourceGroup: testEnv
-          imageToDeploy: ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
-          registryUrl: ghcr.io
-          registryUsername: ${{ secrets.GHCR_STAGING_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.GHCR_STAGING_REGISTRY_PASSWORD }}
+          containerAppName: ${{ env.AZURE_ACA_APP_NAME_STAGING }}
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_STAGING }}
+          imageToDeploy: ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+          registryUrl: ${{ env.REGISTRY_NAME }}
+          registryUsername: ${{ github.actor }}
+          registryPassword: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Staging Deployment URL
+        run:
+            echo "Staging App URL: ${{ steps.deploy.outputs.containerAppUrl }}"
