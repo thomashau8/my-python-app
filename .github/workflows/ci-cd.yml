@@ -24,6 +24,7 @@ env:
   AZURE_ACA_APP_NAME_PROD: prod-container
   REGISTRY_NAME: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  TARGET_PORT: 8000
 
 jobs:
 
@@ -123,3 +124,5 @@ jobs:
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
+          targetPort: ${{ env.TARGET_PORT }}
+

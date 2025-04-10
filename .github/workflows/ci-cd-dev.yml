@@ -18,6 +18,7 @@ env:
   AZURE_ACA_APP_NAME_STAGING: staging-container
   REGISTRY_NAME: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  TARGET_PORT: 8000
 
 jobs:
   setup:
@@ -206,6 +207,7 @@ jobs:
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
+          targetPort: ${{ env.TARGET_PORT }}
 
       - name: Staging Deployment URL
         run: |
