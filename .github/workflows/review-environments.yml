@@ -109,37 +109,85 @@ jobs:
           targetPort: ${{ env.TARGET_PORT }}
           ingress: external
 
-      - name: Debug Deploy Output
-        run: |
-          echo "Deployment Step Succeeded. Checking outputs..."
-          echo "Container App URL Output: >>${{ steps.deploy.outputs.containerAppUrl }}<<"   
+      - name: Deploy to ACA Review Environment
+        id: deploy
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          # ... your deploy configuration ...
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
+          containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
+          containerAppName: ${{ env.APP_NAME }}
+          imageToDeploy: ${{ env.FULL_IMAGE_NAME }}
+          registryUrl: ${{ env.REGISTRY_NAME }}
+          registryUsername: ${{ github.actor }}
+          registryPassword: ${{ secrets.GITHUB_TOKEN }}
+          targetPort: ${{ env.TARGET_PORT }}
+          ingress: external
+          enableProbe: true # Recommended: Add health probes
+          probeType: Readiness
+          probeTcpSocketPort: ${{ env.TARGET_PORT }} # Or use probeRequestPath/probePort for HTTP
+          probeInitialDelaySeconds: 60
+          probePeriodSeconds: 15
 
+      # --- Fetch URL with Retries ---
+      - name: Get ACA FQDN with Retries
+        id: get_url # Use this ID for the step
+        if: github.event_name == 'pull_request' # Only run for PRs
+        run: |
+          echo "Fetching FQDN for app: ${{ env.APP_NAME }} in RG: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}"
+          fqdn="" # Initialize fqdn variable
+
+          # Retry loop (5 attempts with 30 sec wait)
+          for attempt in {1..5}; do
+            # Run az command, store output in fqdn, suppress stderr during check
+            fqdn=$(az containerapp show \
+              --name "${{ env.APP_NAME }}" \
+              --resource-group "${{ env.AZURE_RESOURCE_GROUP_REVIEW }}" \
+              --query properties.configuration.ingress.fqdn \
+              --output tsv 2>/dev/null)
+
+            # Check if fqdn variable is non-empty
+            if [ -n "$fqdn" ]; then
+              echo "FQDN found on attempt $attempt: $fqdn"
+              break # Exit the loop successfully
+            fi
+
+            # If not the last attempt, wait before retrying
+            if [ $attempt -lt 5 ]; then
+              echo "Attempt $attempt: FQDN not found for ${{ env.APP_NAME }}. Waiting 15 seconds..."
+              sleep 15
+            else
+              # Last attempt failed
+              echo "Attempt $attempt: FQDN still not found."
+            fi
+          done
+
+          # After the loop, check if fqdn is still empty (meaning all attempts failed)
+          if [ -z "$fqdn" ]; then
+            echo "::error::Could not retrieve FQDN for ${{ env.APP_NAME }} after $attempt attempts."
+            # Set a specific value indicating failure for the output
+            echo "review_url=unknown" >> "$GITHUB_OUTPUT"
+          else
+            # Construct the full URL
+            app_url="https://${fqdn}"
+            echo "Final App URL: ${app_url}"
+            # Set the output variable for the next step
+            echo "review_url=${app_url}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Handle potential failure or missing URL
       - name: Comment PR with Review URL
-        if: github.event_name == 'pull_request' && steps.deploy.outputs.containerAppUrl != '' # Check if URL output exists
+        if: github.event_name == 'pull_request' && steps.get_url.outputs.review_url != 'unknown'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: review-environment-deployment
           message: |
             🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.ACA_ENVIRONMENT_NAME }}`)
-
+            
             Branch: `${{ github.head_ref }}`
             App Name: `${{ env.APP_NAME }}`
             Commit: `${{ github.sha }}`
-
+            
             ✅ **Deployment Successful!**
-
-            [Access Review App](${{ steps.deploy.outputs.containerAppUrl }})
-
-      # Handle deployment failure or missing URL
-      - name: Post Failure Comment
-        if: failure() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: review-environment-deployment
-          message: |
-            ❌ **Review Environment Deployment Failed:**
-
-            Branch: `${{ github.head_ref }}`
-            Commit: `${{ github.sha }}`
-
-            Please check the [Actions logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
+            
+            [Access Review App](${{ steps.get_url.outputs.review_url }}) # Use output from get_url step
