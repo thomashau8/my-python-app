@@ -1,10 +1,10 @@
 name: CI/CD Pipeline
-
+#TODO fix permissions her
 permissions:
-  contents: read        # Required to read repository content.
-  actions: read         # Allows actions to read data.
-  packages: write       # Required for pushing packages/images.
-  checks: write         # Sometimes needed for uploading reports.
+  contents: read
+  actions: read
+  packages: write
+  checks: write
   security-events: write
   id-token: write
 on:
@@ -19,6 +19,12 @@ env:
   PROJECT_NAME: "my-django-app"
   PYTHON_VERSION: "3.12"
   POETRY_VERSION: "2.0.1"
+  AZURE_RESOURCE_GROUP_PROD: rg_my_python_app_prod
+  AZURE_ACA_ENVIRONMENT_PROD: managedEnvironment-rgmypythonapppr-86f7
+  AZURE_ACA_APP_NAME_PROD: prod-container
+  REGISTRY_NAME: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  TARGET_PORT: 8000
 
 jobs:
 
@@ -52,10 +58,10 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:cache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:cache,mode=max
+            ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache,mode=max
 
   container_scan:
     if: github.event_name == 'push'
@@ -66,7 +72,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'ghcr.io/${{ github.repository }}:${{ github.sha }}'
+          image-ref: '${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'
           severity: 'CRITICAL,HIGH'
           format: 'sarif'
           output: 'trivy-results.sarif'
@@ -78,7 +84,7 @@ jobs:
 
   review:
     name: Approval for Production
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: container_scan
     environment:
@@ -89,12 +95,12 @@ jobs:
 
   deploy_to_azure:
     name: Deploy to Azure Container App
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: review
     permissions:
       contents: read
-      id-token: write  # required for Azure authentication
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -104,17 +110,19 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.GHCRTESTCONTAINER_AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # Deploy your container image from GitHub Container Registry to Azure Container App
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v2
         with:
-          containerAppName: ghcr-test-container
-          resourceGroup: testEnv
-          imageToDeploy: ghcr.io/${{ github.repository }}:${{ github.sha }}
-          registryUrl: ghcr.io
-          registryUsername: ${{ secrets.GHCRTESTCONTAINER_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.GHCRTESTCONTAINER_REGISTRY_PASSWORD }}
+          containerAppName: ${{ env.AZURE_ACA_APP_NAME_PROD }}
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_PROD }}
+          imageToDeploy: ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          registryUrl: ${{ env.REGISTRY_NAME }}
+          registryUsername: ${{ github.actor }}
+          registryPassword: ${{ secrets.GITHUB_TOKEN }}
+          targetPort: ${{ env.TARGET_PORT }}
+

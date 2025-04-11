@@ -1,0 +1,177 @@
+name: Deploy Review Environment
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  pull-requests: write
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - staging
+  # Trigger on specific pull request events targeting any branch
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  AZURE_RESOURCE_GROUP_REVIEW: rg_my_python_app_review
+  ACA_ENVIRONMENT_NAME: review-env
+  ACA_APP_NAME_PREFIX: review-app-
+  REGISTRY_NAME: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  TARGET_PORT: 8000
+
+# Prevent concurrent runs for the same branch/PR, cancel older runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy_review_environment:
+    name: Deploy Review Environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Login to Azure using OIDC
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID_REVIEW }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_REVIEW }}
+
+      # #Determine a unique, safe name for the container app based on the branch/PR
+      - name: Set Dynamic Names
+        id: names
+        run: |
+          # Use head_ref for PRs, ref_name for direct branch pushes
+          raw_ref="${{ github.head_ref || github.ref_name }}"
+          # Sanitize: lowercase, replace non-alphanumeric with '-', trim '-' edges, limit length
+          # Keep it short enough so prefix + slug + potential hash don't exceed limits (ACA name limit is 32)
+          branch_slug=$(echo "$raw_ref" | sed -e 's|[^a-zA-Z0-9]|-|g' | tr '[:upper:]' '[:lower:]' | sed -e 's/^-*//' -e 's/-*$//' | cut -c1-20)
+          # Ensure app name doesn't exceed max length (32 chars)
+          app_name=$(echo "${{ env.ACA_APP_NAME_PREFIX }}${branch_slug}" | cut -c1-32)
+          # Always use commit SHA for unique image tag per deployment
+          image_tag="${{ github.sha }}"
+          full_image_name="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${image_tag}"
+
+          echo "Branch/Ref: ${raw_ref}"
+          echo "Sanitized Slug: ${branch_slug}"
+          echo "Container App Name: ${app_name}"
+          echo "Image Tag: ${image_tag}"
+          echo "Full Image Name: ${full_image_name}"
+
+          echo "APP_NAME=${app_name}" >> $GITHUB_ENV
+          echo "FULL_IMAGE_NAME=${full_image_name}" >> $GITHUB_ENV
+          echo "BRANCH_SLUG=${branch_slug}" >> $GITHUB_ENV # Also export slug if needed elsewhere
+
+      # Login to GitHub Container Registry
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_NAME }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Set up Docker Buildx
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build and push Docker image, tagged with commit SHA
+      - name: Build and Push Docker Image
+        id: build-push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ env.FULL_IMAGE_NAME }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to ACA Review Environment
+        id: deploy
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
+          containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
+          containerAppName: ${{ env.APP_NAME }}
+          imageToDeploy: ${{ env.FULL_IMAGE_NAME }}
+          registryUrl: ${{ env.REGISTRY_NAME }}
+          registryUsername: ${{ github.actor }}
+          registryPassword: ${{ secrets.GITHUB_TOKEN }}
+          targetPort: ${{ env.TARGET_PORT }}
+          ingress: external
+          enableProbe: true
+          probeType: Readiness
+          probeTcpSocketPort: ${{ env.TARGET_PORT }}
+          probeInitialDelaySeconds: 60
+          probePeriodSeconds: 15
+
+      # --- Fetch URL with Retries ---
+      - name: Get ACA FQDN with Retries
+        id: get_url # Use this ID for the step
+        if: github.event_name == 'pull_request' # Only run for PRs
+        run: |
+          echo "Fetching FQDN for app: ${{ env.APP_NAME }} in RG: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}"
+          fqdn="" # Initialize fqdn variable
+
+          # Retry loop (5 attempts with 30 sec wait)
+          for attempt in {1..5}; do
+            # Run az command, store output in fqdn, suppress stderr during check
+            fqdn=$(az containerapp show \
+              --name "${{ env.APP_NAME }}" \
+              --resource-group "${{ env.AZURE_RESOURCE_GROUP_REVIEW }}" \
+              --query properties.configuration.ingress.fqdn \
+              --output tsv 2>/dev/null)
+
+            # Check if fqdn variable is non-empty
+            if [ -n "$fqdn" ]; then
+              echo "FQDN found on attempt $attempt: $fqdn"
+              break # Exit the loop successfully
+            fi
+
+            # If not the last attempt, wait before retrying
+            if [ $attempt -lt 5 ]; then
+              echo "Attempt $attempt: FQDN not found for ${{ env.APP_NAME }}. Waiting 15 seconds..."
+              sleep 15
+            else
+              # Last attempt failed
+              echo "Attempt $attempt: FQDN still not found."
+            fi
+          done
+
+          # After the loop, check if fqdn is still empty (meaning all attempts failed)
+          if [ -z "$fqdn" ]; then
+            echo "::error::Could not retrieve FQDN for ${{ env.APP_NAME }} after $attempt attempts."
+            # Set a specific value indicating failure for the output
+            echo "review_url=unknown" >> "$GITHUB_OUTPUT"
+          else
+            # Construct the full URL
+            app_url="https://${fqdn}"
+            echo "Final App URL: ${app_url}"
+            # Set the output variable for the next step
+            echo "review_url=${app_url}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Handle potential failure or missing URL
+      - name: Comment PR with Review URL
+        if: github.event_name == 'pull_request' && steps.get_url.outputs.review_url != 'unknown'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: review-environment-deployment
+          message: |
+            🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.ACA_ENVIRONMENT_NAME }}`)
+            
+            Branch: `${{ github.head_ref }}`
+            App Name: `${{ env.APP_NAME }}`
+            Commit: `${{ github.sha }}`
+            
+            ✅ **Deployment Successful!**
+            
+            [Access Review App](${{ steps.get_url.outputs.review_url }}) # Use output from get_url step
