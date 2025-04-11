@@ -94,7 +94,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Deploy or update the Container App in the EXISTING ACA environment
       - name: Deploy to ACA Review Environment
         id: deploy
         uses: azure/container-apps-deploy-action@v2
@@ -108,24 +107,9 @@ jobs:
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
           ingress: external
-
-      - name: Deploy to ACA Review Environment
-        id: deploy
-        uses: azure/container-apps-deploy-action@v2
-        with:
-          # ... your deploy configuration ...
-          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
-          containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
-          containerAppName: ${{ env.APP_NAME }}
-          imageToDeploy: ${{ env.FULL_IMAGE_NAME }}
-          registryUrl: ${{ env.REGISTRY_NAME }}
-          registryUsername: ${{ github.actor }}
-          registryPassword: ${{ secrets.GITHUB_TOKEN }}
-          targetPort: ${{ env.TARGET_PORT }}
-          ingress: external
-          enableProbe: true # Recommended: Add health probes
+          enableProbe: true
           probeType: Readiness
-          probeTcpSocketPort: ${{ env.TARGET_PORT }} # Or use probeRequestPath/probePort for HTTP
+          probeTcpSocketPort: ${{ env.TARGET_PORT }}
           probeInitialDelaySeconds: 60
           probePeriodSeconds: 15
 
