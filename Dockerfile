@@ -42,4 +42,4 @@ USER appuser
 EXPOSE 8000
 
 # Set the command to run your application (using Gunicorn for example)
-CMD ["gunicorn", "--workers=1", "--bind=0.0.0.0:8000", "config.wsgi:application"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
