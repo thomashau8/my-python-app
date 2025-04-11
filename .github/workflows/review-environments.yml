@@ -17,7 +17,6 @@ on:
 
 env:
   AZURE_RESOURCE_GROUP_REVIEW: rg_my_python_app_review
-  AZURE_LOCATION: norwayeast
   ACA_ENVIRONMENT_NAME: review-env
   ACA_APP_NAME_PREFIX: review-app-
   REGISTRY_NAME: ghcr.io
@@ -101,9 +100,9 @@ jobs:
         uses: azure/container-apps-deploy-action@v2
         with:
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
-          environmentName: ${{ env.AZURE_ACA_ENVIRONMENT_REVIEW }}
+          containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
           containerAppName: ${{ env.APP_NAME }}
-          imageToDeploy: ${{ steps.build-push.outputs.digest }} # Use specific digest
+          imageToDeploy: ${{ steps.build-push.outputs.digest }}
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
@@ -116,7 +115,7 @@ jobs:
         with:
           header: review-environment-deployment
           message: |
-            🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.AZURE_ACA_ENVIRONMENT_REVIEW }}`)
+            🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.ACA_ENVIRONMENT_NAME }}`)
 
             Branch: `${{ github.head_ref }}`
             App Name: `${{ env.APP_NAME }}`
