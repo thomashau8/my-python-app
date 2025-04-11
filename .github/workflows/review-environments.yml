@@ -102,7 +102,7 @@ jobs:
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
           containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
           containerAppName: ${{ env.APP_NAME }}
-          imageToDeploy: ${{ steps.build-push.outputs.digest }}
+          imageToDeploy: ${{ env.FULL_IMAGE_NAME }}
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
