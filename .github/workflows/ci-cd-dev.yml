@@ -176,8 +176,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
             ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-latest
-         # cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache
-       #   cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache
+          cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache,mode=max
 
   deploy_to_azure_staging:
     name: Deploy to Azure Staging
