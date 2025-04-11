@@ -98,6 +98,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: review
+    environment:
+      name: staging
     permissions:
       contents: read
       id-token: write

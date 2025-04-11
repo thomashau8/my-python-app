@@ -113,10 +113,9 @@ jobs:
           probeInitialDelaySeconds: 60
           probePeriodSeconds: 15
 
-      # --- Fetch URL with Retries ---
       - name: Get ACA FQDN with Retries
-        id: get_url # Use this ID for the step
-        if: github.event_name == 'pull_request' # Only run for PRs
+        id: get_url
+        if: github.event_name == 'pull_request'
         run: |
           echo "Fetching FQDN for app: ${{ env.APP_NAME }} in RG: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}"
           fqdn="" # Initialize fqdn variable
@@ -159,7 +158,6 @@ jobs:
             echo "review_url=${app_url}" >> "$GITHUB_OUTPUT"
           fi
 
-      # Handle potential failure or missing URL
       - name: Comment PR with Review URL
         if: github.event_name == 'pull_request' && steps.get_url.outputs.review_url != 'unknown'
         uses: marocchino/sticky-pull-request-comment@v2
@@ -174,4 +172,4 @@ jobs:
             
             ✅ **Deployment Successful!**
             
-            [Access Review App](${{ steps.get_url.outputs.review_url }}) # Use output from get_url step
+            [Access Review App](${{ steps.get_url.outputs.review_url }}) #
