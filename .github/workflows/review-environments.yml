@@ -109,6 +109,11 @@ jobs:
           targetPort: ${{ env.TARGET_PORT }}
           ingress: external
 
+      - name: Debug Deploy Output
+        run: |
+          echo "Deployment Step Succeeded. Checking outputs..."
+          echo "Container App URL Output: >>${{ steps.deploy.outputs.containerAppUrl }}<<"   
+
       - name: Comment PR with Review URL
         if: github.event_name == 'pull_request' && steps.deploy.outputs.containerAppUrl != '' # Check if URL output exists
         uses: marocchino/sticky-pull-request-comment@v2
