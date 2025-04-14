@@ -152,11 +152,6 @@ jobs:
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
-          enableProbe: true
-          probeType: Readiness
-          probeTcpSocketPort: ${{ env.TARGET_PORT }}
-          probeInitialDelaySeconds: 60
-          probePeriodSeconds: 15
 
       - name: Staging Deployment URL
         # Check action output first, fallback to CLI if needed (though deploy action should work now)

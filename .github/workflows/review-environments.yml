@@ -149,11 +149,6 @@ jobs:
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
           ingress: external
-          enableProbe: true
-          probeType: Readiness
-          probeTcpSocketPort: ${{ env.TARGET_PORT }} # Or use probeRequestPath/probePort for HTTP
-          probeInitialDelaySeconds: 60
-          probePeriodSeconds: 15
 
       - name: Get ACA FQDN with Retries
         id: get_url

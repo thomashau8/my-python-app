@@ -170,8 +170,3 @@ jobs:
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
-          enableProbe: true
-          probeType: Readiness
-          probeTcpSocketPort: ${{ env.TARGET_PORT }}
-          probeInitialDelaySeconds: 60
-          probePeriodSeconds: 15
