@@ -1,18 +1,18 @@
 # .github/actions/run-container-scan/action.yml
 name: 'Run Container Scan'
-description: 'Runs Trivy vulnerability scan on a specified container image'
+description: 'Installs Trivy CLI, runs scan, saves SARIF, uploads report.'
 inputs:
   image-ref:
     description: 'Full reference to the container image to scan (e.g., registry/repo:tag)'
     required: true
   severity:
-    description: 'Comma-separated list of severities to fail on'
+    description: 'Comma-separated list of severities to check'
     required: false
     default: 'CRITICAL,HIGH'
   exit-code:
-    description: 'Exit code for Trivy scan failure'
+    description: 'Exit code if vulnerabilities are found (0 means pass regardless)'
     required: false
-    default: '1' # Fail the step if vulnerabilities found
+    default: '1' # Default to fail if specified severities found
   sarif-report-path:
     description: 'Output path for the SARIF report'
     required: false
@@ -20,31 +20,83 @@ inputs:
   artifact-name:
     description: 'Name for the SARIF report artifact'
     required: false
-    default: 'trivy-scan-report'
+    default: 'trivy-scan-report-${{ github.run_id }}' # Unique artifact name
 
 runs:
   using: "composite"
   steps:
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ inputs.image-ref }}
-        severity: ${{ inputs.severity }}
-        exit-code: ${{ inputs.exit-code }}
-        format: 'sarif'
-        output: ${{ inputs.sarif-report-path }}
+    # 1. Install Trivy CLI using official installer
+    - name: Install Trivy CLI
+      shell: bash
+      run: |
+        sudo apt-get update -yqq
+        sudo apt-get install -yqq --no-install-recommends wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/aqua-security.asc | gpg --dearmor | sudo tee /usr/share/keyrings/aqua-security.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/aqua-security.gpg] https://aquasecurity.github.io/trivy-repo $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list > /dev/null
+        sudo apt-get update -yqq
+        sudo apt-get install -yqq trivy
 
+    # 2. Run Trivy Scan (Save SARIF, check exit code based on input)
+    - name: Run Trivy Scan
+      id: trivy_scan # Give step an ID
+      continue-on-error: true # Let the step 'fail' but capture outcome
+      shell: bash
+      run: |
+        echo "Scanning ${{ inputs.image-ref }} for severities: ${{ inputs.severity }}"
+        # Run trivy:
+        # --exit-code ${{ inputs.exit-code }} : Fail based on input if vulnerabilities found at specified severity
+        # --severity ${{ inputs.severity }} : Only report these severities
+        # --format sarif : Output format
+        # --output ${{ inputs.sarif-report-path }} : Output file
+        # --no-progress : Cleaner logs for CI
+        trivy image \
+          --exit-code ${{ inputs.exit-code }} \
+          --severity ${{ inputs.severity }} \
+          --format sarif \
+          --output ${{ inputs.sarif-report-path }} \
+          --no-progress \
+          ${{ inputs.image-ref }}
+
+        # Store the actual exit code of the trivy command
+        trivy_status=$?
+        echo "Trivy CLI scan finished with exit code: ${trivy_status}"
+        echo "trivy_exit_code=${trivy_status}" >> $GITHUB_OUTPUT
+
+    # 3. Optionally Print Table Output to Logs (regardless of failure)
+    - name: Display Trivy Results (Table)
+      if: always() # Run even if previous steps failed
+      shell: bash
+      run: |
+        echo "Displaying scan results (Table format, all severities):"
+        # Scan again, but exit 0 and format as table to stdout
+        trivy image \
+          --exit-code 0 \
+          --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+          --format table \
+          --no-progress \
+          ${{ inputs.image-ref }} || echo "Trivy table output command failed."
+
+    # 4. Upload SARIF Artifact (regardless of failure)
     - name: Upload Trivy SARIF report artifact
+      if: always() # Run even if scan failed
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ inputs.sarif-report-path }}
         retention-days: 7
 
-    # Also upload to GitHub Security tab
+    # 5. Upload SARIF to GitHub Security Tab (regardless of failure)
     - name: Upload Trivy scan results to GitHub Security tab
+      if: always() # Run even if scan failed
       uses: github/codeql-action/upload-sarif@v3
-      # Run this step even if Trivy fails (exit-code=1) to ensure report is uploaded
-      if: success() || failure()
       with:
         sarif_file: ${{ inputs.sarif-report-path }}
+
+    # 6. Fail Job if Trivy Exited Non-Zero (based on original exit code setting)
+    # This step ensures the overall job status reflects the scan result if exit-code input was '1'
+    - name: Check Trivy Exit Code
+      if: steps.trivy_scan.outputs.trivy_exit_code != '0' && inputs.exit-code == '1'
+      shell: bash
+      run: |
+        echo "::error::Trivy scan found vulnerabilities with specified severity and exit-code is set to fail (Exit Code: ${{ steps.trivy_scan.outputs.trivy_exit_code }})."
+        exit 1 # Explicitly fail the job
