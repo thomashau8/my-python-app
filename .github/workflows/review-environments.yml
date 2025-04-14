@@ -76,9 +76,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }} # Still needed for pipx setup
           bandit-scan-path: ${{ env.BANDIT_SCAN_PATH }}
-          # dockerfile-path: 'Dockerfile' # Default is usually fine
 
-  # --- Build, Deploy, Comment Job (Depends on Checks) ---
   build_deploy_comment:
     name: Build, Deploy & Comment (Review Env)
     runs-on: ubuntu-latest
@@ -97,11 +95,9 @@ jobs:
       - name: Set Dynamic Names
         id: names
         run: |
-          # Use head_ref for PRs, ref_name for direct branch pushes
           raw_ref="${{ github.head_ref || github.ref_name }}"
           branch_slug=$(echo "$raw_ref" | sed -e 's|[^a-zA-Z0-9]|-|g' | tr '[:upper:]' '[:lower:]' | sed -e 's/^-*//' -e 's/-*$//' | cut -c1-20)
           app_name=$(echo "${{ env.ACA_APP_NAME_PREFIX }}${branch_slug}" | cut -c1-32)
-          # Use commit SHA for unique image tag per deployment
           image_tag="${{ github.sha }}"
           full_image_name="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${image_tag}"
 
@@ -122,7 +118,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up QEMU # Needed for buildx multi-platform (good practice)
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
@@ -147,13 +143,13 @@ jobs:
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
           containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
           containerAppName: ${{ env.APP_NAME }}
-          imageToDeploy: ${{ env.FULL_IMAGE_NAME }} # Use full name
+          imageToDeploy: ${{ env.FULL_IMAGE_NAME }}
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
           ingress: external
-          enableProbe: true # Add probes
+          enableProbe: true
           probeType: Readiness
           probeTcpSocketPort: ${{ env.TARGET_PORT }} # Or use probeRequestPath/probePort for HTTP
           probeInitialDelaySeconds: 60
@@ -172,7 +168,6 @@ jobs:
               break
             fi
             if [ $attempt -lt 5 ]; then
-              # Reduced sleep for faster feedback in review, adjust if needed
               echo "Attempt $attempt: FQDN not found for ${{ env.APP_NAME }}. Waiting 15 seconds..."
               sleep 15
             else
