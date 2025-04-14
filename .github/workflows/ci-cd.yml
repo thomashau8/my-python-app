@@ -116,8 +116,8 @@ jobs:
           tags: |
             ${{ steps.set-names.outputs.image_name_full }}
             ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest
-           cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache
-           cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache,mode=max
 
   container_scan:
     name: Container Scan
