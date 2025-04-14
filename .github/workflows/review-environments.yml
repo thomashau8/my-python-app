@@ -42,7 +42,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-linter@main # Use main branch or specific tag/commit
+      - uses: ./.github/actions/run-linter # Use main branch or specific tag/commit
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           poetry-version: ${{ env.POETRY_VERSION }}
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-tests@main
+      - uses: ./.github/actions/run-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           poetry-version: ${{ env.POETRY_VERSION }}
@@ -72,7 +72,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-security-checks@main # change this from @main to v1.0 eventually
+      - uses: ./.github/actions/run-security-checks # change this from @main to v1.0 eventually
         with:
           python-version: ${{ env.PYTHON_VERSION }} # Still needed for pipx setup
           bandit-scan-path: ${{ env.BANDIT_SCAN_PATH }}

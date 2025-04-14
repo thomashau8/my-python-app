@@ -33,7 +33,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-linter@main # Use main branch or a specific tag/commit
+      - uses: ./.github/actions/run-linter # Use main branch or a specific tag/commit
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           poetry-version: ${{ env.POETRY_VERSION }}
@@ -47,7 +47,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-tests@main
+      - uses: ./.github/actions/run-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           poetry-version: ${{ env.POETRY_VERSION }}
@@ -62,7 +62,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-security-checks@main
+      - uses: ./.github/actions/run-security-checks
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           bandit-scan-path: ${{ env.BANDIT_SCAN_PATH }}

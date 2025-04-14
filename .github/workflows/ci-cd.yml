@@ -40,7 +40,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: .github/actions/run-linter@main # Use version tag later (@v1.0)
+      - uses: ./.github/actions/run-linter@main # Use version tag later (@v1.0)
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           poetry-version: ${{ env.POETRY_VERSION }}
