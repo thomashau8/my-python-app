@@ -4,10 +4,11 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential=12.9 \
-      libpq-dev=15.12-0+deb12u2 \
-      curl=7.88.1-10+deb12u12 && \
-    rm -rf /var/lib/apt/lists/*
+      build-essential \
+      libpq-dev \
+      curl \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
 RUN bash -o pipefail -c "curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.1 python3 -"
@@ -35,10 +36,14 @@ FROM builder AS production
 WORKDIR /app
 
 # Create a non-root user for security
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN if ! id appuser > /dev/null 2>&1; then \
+        addgroup --system appgroup && adduser --system --ingroup appgroup appuser; \
+    fi
+
+RUN chown -R appuser:appgroup /app || true
+
 USER appuser
 
-# Expose the port that your application listens on
 EXPOSE 8000
 
 # Set the command to run your application (using Gunicorn for example)
