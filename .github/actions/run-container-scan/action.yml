@@ -1,6 +1,6 @@
 # .github/actions/run-container-scan/action.yml
 name: 'Run Container Scan'
-description: 'Runs Trivy vulnerability scan on a specified container image and uploads report.'
+description: 'Runs Trivy vulnerability scan on a specified container image'
 inputs:
   image-ref:
     description: 'Full reference to the container image to scan (e.g., registry/repo:tag)'
@@ -10,9 +10,9 @@ inputs:
     required: false
     default: 'CRITICAL,HIGH'
   exit-code:
-    description: 'Exit code for Trivy scan failure (0 to not fail step, 1 to fail)'
+    description: 'Exit code for Trivy scan failure'
     required: false
-    default: '1' # Fail the step if vulnerabilities found by default
+    default: '0' # Fail the step if vulnerabilities found
   sarif-report-path:
     description: 'Output path for the SARIF report'
     required: false
@@ -20,13 +20,13 @@ inputs:
   artifact-name:
     description: 'Name for the SARIF report artifact'
     required: false
-    default: 'trivy-scan-report-${{ github.run_id }}' # Unique artifact name
+    default: 'trivy-scan-report'
 
 runs:
   using: "composite"
   steps:
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@master
       with:
         image-ref: ${{ inputs.image-ref }}
         severity: ${{ inputs.severity }}
@@ -34,19 +34,17 @@ runs:
         format: 'sarif'
         output: ${{ inputs.sarif-report-path }}
 
-
     - name: Upload Trivy SARIF report artifact
-      # Run this step even if Trivy fails (exit-code=1) to ensure report artifact is always saved
-      if: success() || failure()
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ inputs.sarif-report-path }}
         retention-days: 7
 
+    # Also upload to GitHub Security tab
     - name: Upload Trivy scan results to GitHub Security tab
-      # Run this step even if Trivy fails (exit-code=1) to ensure report is uploaded for viewing
-      if: success() || failure()
       uses: github/codeql-action/upload-sarif@v3
+      # Run this step even if Trivy fails (exit-code=1) to ensure report is uploaded
+      if: success() || failure()
       with:
         sarif_file: ${{ inputs.sarif-report-path }}

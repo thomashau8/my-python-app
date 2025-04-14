@@ -4,6 +4,8 @@ permissions:
   contents: read
   packages: write
   id-token: write
+  security-events: write
+
 on:
   push:
     branches:
@@ -19,148 +21,79 @@ env:
   REGISTRY_NAME: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   TARGET_PORT: 8000
+  DJANGO_MANAGE_PY_PATH: "manage.py"
+  PYTEST_COV_OPTIONS: '--cov=my_project --cov-report=term --cov-report=html' # Change my_project
+  BANDIT_SCAN_PATH: './my_project' # Change my_project
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Restore Poetry cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.local
-          key: poetry-${{ runner.os }}-${{ env.POETRY_VERSION }}
-
-      - name: Restore cached virtual environment
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            venv-${{ runner.os }}-
-
-      - name: Install Poetry (if not cached)
-        run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ env.POETRY_VERSION }} python3 -
-
-      - name: Add Poetry to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Configure Poetry
-        run: poetry config virtualenvs.in-project true
-
-      - name: Install Dependencies (if cache missed)
-        if: steps.venv-cache.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-ansi --no-root
-
-      - name: Prepare artifact directories
-        run: |
-          mkdir -p ${{ github.workspace }}/venv_artifact
-          mkdir -p ${{ github.workspace }}/local_artifact
-          cp -r .venv/* ${{ github.workspace }}/venv_artifact/
-          cp -r ~/.local/* ${{ github.workspace }}/local_artifact/
-
-      - name: Upload .venv artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: venv-artifact
-          path: ${{ github.workspace }}/venv_artifact
-
-      - name: Upload poetry cache artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: poetry-cache-artifact
-          path: ${{ github.workspace }}/local_artifact
-
   lint:
+    name: Lint Code
     runs-on: ubuntu-latest
-    needs: setup
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
+      - uses: ./.github/actions/run-linter
         with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      - name: Run Pre-Commit Hooks
-        run: poetry run pre-commit run --all-files
+          python-version: ${{ env.PYTHON_VERSION }}
+          poetry-version: ${{ env.POETRY_VERSION }}
 
   test:
+    name: Run Tests
     runs-on: ubuntu-latest
-    needs: setup
+    # Optional: Add secrets if tests need DB access etc.
+    # secrets: inherit
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
+      - uses: ./.github/actions/run-tests
         with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      - name: Run Migrations
-        run: poetry run python manage.py migrate
-
-      - name: Run Tests with Coverage
-        run: poetry run pytest --cov=my_project --cov-report=term --cov-report=html
-
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: htmlcov/
+          python-version: ${{ env.PYTHON_VERSION }}
+          poetry-version: ${{ env.POETRY_VERSION }}
+          django-manage-py-path: ${{ env.DJANGO_MANAGE_PY_PATH }}
+          pytest-cov-options: ${{ env.PYTEST_COV_OPTIONS }}
+          coverage-artifact-name: 'staging-coverage-report'
 
   security_checks:
-    needs: setup
+    name: Security Checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - uses: ./.github/actions/run-security-checks
         with:
-          fetch-depth: 0
-
-      - name: Run Common Setup
-        uses: ./.github/actions/setup-environment/
-        with:
-          venvArtifactName: 'venv-artifact'
-          poetryCacheArtifactName: 'poetry-cache-artifact'
-
-      # Run Gitleaks to check for secrets
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Bandit static code security analysis
-      - name: Run Bandit
-        run: poetry run bandit -r ./my_project
-
-      # Hadolint to lint Dockerfile
-      - name: Run Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
+          python-version: ${{ env.PYTHON_VERSION }}
+          bandit-scan-path: ${{ env.BANDIT_SCAN_PATH }}
+          # dockerfile-path: 'Dockerfile' # Default is usually fine
 
   build_and_push_staging_image:
     name: Build and Push Staging Docker Image
     runs-on: ubuntu-latest
     needs: [ lint, test, security_checks ]
+    outputs:
+      image_name_full: ${{ steps.set-names.outputs.image_name_full }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set image names
+        id: set-names
+        run: |
+          IMAGE_TAG="staging-${{ github.sha }}"
+          IMAGE_NAME_FULL="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "image_name_full=${IMAGE_NAME_FULL}" >> $GITHUB_OUTPUT
+        shell: bash
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY_NAME }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Sets up multi-platform docker image
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -174,21 +107,31 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+            ${{ steps.set-names.outputs.image_name_full }}
             ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-latest
-          cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache
-          cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-cache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:cache,mode=max
+
+  container_scan:
+    name: Container Scan
+    runs-on: ubuntu-latest
+    needs: build_and_push_staging_image
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/run-container-scan
+        with:
+          image-ref: ${{ needs.build_and_push_staging_image.outputs.image_name_full }}
 
   deploy_to_azure_staging:
     name: Deploy to Azure Staging
     runs-on: ubuntu-latest
-    needs: build_and_push_staging_image
+    needs: [build_and_push_staging_image, container_scan] # Depends on build output and successful scan
     environment:
-      name: staging
+      name: staging # Links to GitHub Environment for secrets
     permissions:
-      contents: read
-      id-token: write
-
+      id-token: write # Required for Azure Login
     steps:
       - name: Azure Login
         uses: azure/login@v2
@@ -203,12 +146,21 @@ jobs:
         with:
           containerAppName: ${{ env.AZURE_ACA_APP_NAME_STAGING }}
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_STAGING }}
-          imageToDeploy: ${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+          containerAppEnvironment: ${{ env.AZURE_ACA_ENVIRONMENT_STAGING }} # Explicitly set env
+          imageToDeploy: ${{ needs.build_and_push_staging_image.outputs.image_name_full }}
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
 
       - name: Staging Deployment URL
+        # Check action output first, fallback to CLI if needed (though deploy action should work now)
         run: |
-            echo "Staging App URL: ${{ steps.deploy.outputs.containerAppUrl }}"
+          url_output="${{ steps.deploy.outputs.containerAppUrl }}"
+          if [ -n "$url_output" ]; then
+            echo "Staging App URL (from action output): $url_output"
+          else
+            echo "Action output empty, trying CLI..."
+            # Add CLI fetch logic here if needed as a fallback
+            echo "Staging App URL: (Not Available)"
+          fi
