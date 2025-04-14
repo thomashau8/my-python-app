@@ -63,7 +63,7 @@ jobs:
           django-manage-py-path: ${{ env.DJANGO_MANAGE_PY_PATH }}
           pytest-cov-options: ${{ env.PYTEST_COV_OPTIONS }}
           # Prevent coverage artifact upload for review builds
-          coverage-artifact-name: '' # Pass empty string or specific input to disable upload
+          coverage-artifact-name: ''
 
   security_checks:
     name: Security Checks

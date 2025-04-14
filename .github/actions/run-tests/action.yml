@@ -87,8 +87,9 @@ runs:
       working-directory: ${{ inputs.working-directory }}
 
     - name: Upload Coverage Report
+      if: inputs.coverage-artifact-name != ''
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.coverage-artifact-name }}
-        path: ${{ inputs.working-directory }}/htmlcov/ # Path where coverage report is generated
+        path: ${{ inputs.working-directory }}/htmlcov/
         retention-days: 7

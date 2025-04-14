@@ -33,7 +33,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/run-linter # Use main branch or a specific tag/commit
+      - uses: ./.github/actions/run-linter
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           poetry-version: ${{ env.POETRY_VERSION }}
@@ -53,7 +53,7 @@ jobs:
           poetry-version: ${{ env.POETRY_VERSION }}
           django-manage-py-path: ${{ env.DJANGO_MANAGE_PY_PATH }}
           pytest-cov-options: ${{ env.PYTEST_COV_OPTIONS }}
-          # coverage-artifact-name: 'staging-coverage-report' # Optional override
+         coverage-artifact-name: 'staging-coverage-report'
 
   security_checks:
     name: Security Checks
