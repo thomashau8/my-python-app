@@ -1,0 +1,67 @@
+# .github/actions/run-security-checks/action.yml
+name: 'Run Security Checks'
+description: 'Checks out code, runs Gitleaks, Bandit (via pipx), Hadolint.'
+inputs:
+  python-version:
+    description: 'Python version to install Bandit with'
+    required: true
+  dockerfile-path:
+    description: 'Path to the Dockerfile for Hadolint'
+    required: false
+    default: 'Dockerfile'
+  bandit-scan-path:
+    description: 'Path for Bandit code scan (default scans current dir)'
+    required: false
+    default: '.' # Default to scanning current directory
+  working-directory: # Added this input for consistency
+    description: 'Directory to run commands in'
+    required: false
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    # Checkout with full history for Gitleaks
+    - name: Checkout Code (Full History)
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # --- Run Checks ---
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+    # Setup Python *only* for Bandit installation via pipx
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install pipx
+      run: python -m pip install --upgrade pipx
+      shell: bash
+
+    # Cache pipx environments
+    - name: Cache pipx environments
+      id: cache-pipx
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/pipx # Cache the pipx directory
+        # Key includes Python version as pipx installs can be version specific
+        key: pipx-${{ runner.os }}-${{ inputs.python-version }}
+
+    - name: Install Bandit via pipx (uses cache if available)
+      run: pipx install bandit
+      shell: bash
+
+    - name: Run Bandit via pipx
+      run: pipx run bandit -r ${{ inputs.bandit-scan-path }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }} # Run bandit relative to specified dir
+
+    - name: Run Hadolint
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: ${{ inputs.working-directory }}/${{ inputs.dockerfile-path }} # Ensure path is relative to checkout

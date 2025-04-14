@@ -16,12 +16,18 @@ on:
     types: [opened, synchronize, reopened]
 
 env:
+  PYTHON_VERSION: "3.12"
+  POETRY_VERSION: "2.0.1"
   AZURE_RESOURCE_GROUP_REVIEW: rg_my_python_app_review
   ACA_ENVIRONMENT_NAME: review-env
   ACA_APP_NAME_PREFIX: review-app-
   REGISTRY_NAME: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   TARGET_PORT: 8000
+  # Project Specifics (Adjust these!)
+  DJANGO_MANAGE_PY_PATH: 'manage.py'
+  PYTEST_COV_OPTIONS: '--cov=my_project --cov-report=term' # No htmlcov needed usually for review
+  BANDIT_SCAN_PATH: './my_project'
 
 # Prevent concurrent runs for the same branch/PR, cancel older runs
 concurrency:
@@ -29,34 +35,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy_review_environment:
-    name: Deploy Review Environment
+  lint:
+    name: Lint Code
     runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/run-linter@main # Use main branch or specific tag/commit
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          poetry-version: ${{ env.POETRY_VERSION }}
 
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    # Optional: Add secrets if tests need DB access etc.
+    # secrets: inherit
+    steps:
+      - uses: ./.github/actions/run-tests@main
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          poetry-version: ${{ env.POETRY_VERSION }}
+          django-manage-py-path: ${{ env.DJANGO_MANAGE_PY_PATH }}
+          pytest-cov-options: ${{ env.PYTEST_COV_OPTIONS }}
+          # Prevent coverage artifact upload for review builds
+          coverage-artifact-name: '' # Pass empty string or specific input to disable upload
+
+  security_checks:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/run-security-checks@main # change this from @main to v1.0 eventually
+        with:
+          python-version: ${{ env.PYTHON_VERSION }} # Still needed for pipx setup
+          bandit-scan-path: ${{ env.BANDIT_SCAN_PATH }}
+          # dockerfile-path: 'Dockerfile' # Default is usually fine
+
+  # --- Build, Deploy, Comment Job (Depends on Checks) ---
+  build_deploy_comment:
+    name: Build, Deploy & Comment (Review Env)
+    runs-on: ubuntu-latest
+    needs: [lint, test, security_checks] # Run only after checks pass
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Login to Azure using OIDC
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID_REVIEW }} # Use REVIEW secrets
           tenant-id: ${{ secrets.AZURE_TENANT_ID_REVIEW }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_REVIEW }}
 
-      # #Determine a unique, safe name for the container app based on the branch/PR
       - name: Set Dynamic Names
         id: names
         run: |
           # Use head_ref for PRs, ref_name for direct branch pushes
           raw_ref="${{ github.head_ref || github.ref_name }}"
-          # Sanitize: lowercase, replace non-alphanumeric with '-', trim '-' edges, limit length
-          # Keep it short enough so prefix + slug + potential hash don't exceed limits (ACA name limit is 32)
           branch_slug=$(echo "$raw_ref" | sed -e 's|[^a-zA-Z0-9]|-|g' | tr '[:upper:]' '[:lower:]' | sed -e 's/^-*//' -e 's/-*$//' | cut -c1-20)
-          # Ensure app name doesn't exceed max length (32 chars)
           app_name=$(echo "${{ env.ACA_APP_NAME_PREFIX }}${branch_slug}" | cut -c1-32)
-          # Always use commit SHA for unique image tag per deployment
+          # Use commit SHA for unique image tag per deployment
           image_tag="${{ github.sha }}"
           full_image_name="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${image_tag}"
 
@@ -68,9 +104,8 @@ jobs:
 
           echo "APP_NAME=${app_name}" >> $GITHUB_ENV
           echo "FULL_IMAGE_NAME=${full_image_name}" >> $GITHUB_ENV
-          echo "BRANCH_SLUG=${branch_slug}" >> $GITHUB_ENV # Also export slug if needed elsewhere
+        shell: bash
 
-      # Login to GitHub Container Registry
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -78,11 +113,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Set up Docker Buildx
-      - name: Setup Docker Buildx
+      - name: Set up QEMU # Needed for buildx multi-platform (good practice)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build and push Docker image, tagged with commit SHA
       - name: Build and Push Docker Image
         id: build-push
         uses: docker/build-push-action@v6
@@ -91,6 +127,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ env.FULL_IMAGE_NAME }}
+          # Use GHA cache for review builds - faster than registry cache usually
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -101,15 +138,15 @@ jobs:
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}
           containerAppEnvironment: ${{ env.ACA_ENVIRONMENT_NAME }}
           containerAppName: ${{ env.APP_NAME }}
-          imageToDeploy: ${{ env.FULL_IMAGE_NAME }}
+          imageToDeploy: ${{ env.FULL_IMAGE_NAME }} # Use full name
           registryUrl: ${{ env.REGISTRY_NAME }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GITHUB_TOKEN }}
           targetPort: ${{ env.TARGET_PORT }}
           ingress: external
-          enableProbe: true
+          enableProbe: true # Add probes
           probeType: Readiness
-          probeTcpSocketPort: ${{ env.TARGET_PORT }}
+          probeTcpSocketPort: ${{ env.TARGET_PORT }} # Or use probeRequestPath/probePort for HTTP
           probeInitialDelaySeconds: 60
           probePeriodSeconds: 15
 
@@ -118,43 +155,27 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           echo "Fetching FQDN for app: ${{ env.APP_NAME }} in RG: ${{ env.AZURE_RESOURCE_GROUP_REVIEW }}"
-          fqdn="" # Initialize fqdn variable
-
-          # Retry loop (5 attempts with 30 sec wait)
+          fqdn=""
           for attempt in {1..5}; do
-            # Run az command, store output in fqdn, suppress stderr during check
-            fqdn=$(az containerapp show \
-              --name "${{ env.APP_NAME }}" \
-              --resource-group "${{ env.AZURE_RESOURCE_GROUP_REVIEW }}" \
-              --query properties.configuration.ingress.fqdn \
-              --output tsv 2>/dev/null)
-
-            # Check if fqdn variable is non-empty
+            fqdn=$(az containerapp show --name "${{ env.APP_NAME }}" --resource-group "${{ env.AZURE_RESOURCE_GROUP_REVIEW }}" --query properties.configuration.ingress.fqdn --output tsv 2>/dev/null)
             if [ -n "$fqdn" ]; then
               echo "FQDN found on attempt $attempt: $fqdn"
-              break # Exit the loop successfully
+              break
             fi
-
-            # If not the last attempt, wait before retrying
             if [ $attempt -lt 5 ]; then
+              # Reduced sleep for faster feedback in review, adjust if needed
               echo "Attempt $attempt: FQDN not found for ${{ env.APP_NAME }}. Waiting 15 seconds..."
               sleep 15
             else
-              # Last attempt failed
               echo "Attempt $attempt: FQDN still not found."
             fi
           done
-
-          # After the loop, check if fqdn is still empty (meaning all attempts failed)
           if [ -z "$fqdn" ]; then
             echo "::error::Could not retrieve FQDN for ${{ env.APP_NAME }} after $attempt attempts."
-            # Set a specific value indicating failure for the output
             echo "review_url=unknown" >> "$GITHUB_OUTPUT"
           else
-            # Construct the full URL
             app_url="https://${fqdn}"
             echo "Final App URL: ${app_url}"
-            # Set the output variable for the next step
             echo "review_url=${app_url}" >> "$GITHUB_OUTPUT"
           fi
 
@@ -165,11 +186,25 @@ jobs:
           header: review-environment-deployment
           message: |
             🚀 **Review Environment Deployed/Updated:** (in shared env `${{ env.ACA_ENVIRONMENT_NAME }}`)
-            
+
             Branch: `${{ github.head_ref }}`
             App Name: `${{ env.APP_NAME }}`
             Commit: `${{ github.sha }}`
-            
+
             ✅ **Deployment Successful!**
-            
-            [Access Review App](${{ steps.get_url.outputs.review_url }}) #
+
+            [Access Review App](${{ steps.get_url.outputs.review_url }})
+
+      # Failure comment remains the same - checks overall job failure
+      - name: Post Failure Comment
+        if: failure() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: review-environment-deployment # Same header
+          message: |
+            ❌ **Review Environment Deployment Failed:**
+
+            Branch: `${{ github.head_ref }}`
+            Commit: `${{ github.sha }}`
+
+            Please check the [Actions logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.

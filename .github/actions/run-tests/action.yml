@@ -1,0 +1,94 @@
+# .github/actions/run-tests/action.yml
+name: 'Run Tests'
+description: 'Checks out code, sets up environment with caching, runs migrations and tests, uploads coverage.'
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: true
+  poetry-version:
+    description: 'Poetry version to use'
+    required: true
+  working-directory:
+    description: 'Directory to run commands in'
+    required: false
+    default: '.'
+  coverage-artifact-name:
+    description: 'Name for the coverage report artifact'
+    required: false
+    default: 'coverage-report-${{ github.run_id }}-${{ github.job }}' # Make artifact name unique per job/run
+  django-manage-py-path:
+    description: 'Path relative to working directory for manage.py'
+    required: false
+    default: 'manage.py' # Assuming manage.py is at the root
+  pytest-cov-options:
+    description: 'Options for pytest coverage'
+    required: false
+    default: '--cov=my_project --cov-report=term --cov-report=html' # IMPORTANT: Adjust my_project
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install and Configure Poetry
+      shell: bash
+      run: |
+        echo "Installing Poetry..."
+        curl -sSL https://install.python-poetry.org | POETRY_VERSION=${{ inputs.poetry-version }} python3 -
+        echo "Adding Poetry to PATH..."
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        echo "Fixing Poetry permissions..."
+        chmod +x $HOME/.local/bin/poetry || true
+        chmod -R +x $HOME/.local/share/pypoetry/venv/bin/ || true
+        echo "Configuring Poetry..."
+        poetry config virtualenvs.in-project true
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Cache Poetry virtualenv
+      id: cache-venv
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.working-directory }}/.venv
+        key: venv-${{ runner.os }}-${{ inputs.python-version }}-${{ hashFiles(format('{0}/poetry.lock', inputs.working-directory)) }}
+        restore-keys: |
+          venv-${{ runner.os }}-${{ inputs.python-version }}-
+
+    - name: Install dependencies (if cache missed)
+      if: steps.cache-venv.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+         echo "Cache miss or invalid, installing dependencies..."
+         poetry install --no-interaction --no-ansi --no-root
+         echo "Fixing venv permissions after install..."
+         chmod -R +x ${{ inputs.working-directory }}/.venv/bin/ || true
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Run Migrations
+      # Optional: Add env vars here if migrate needs DB connection
+      # env:
+      #   DATABASE_URL: ${{ secrets.TEST_DB_URL }} # Example
+      run: poetry run python ${{ inputs.django-manage-py-path }} migrate --noinput
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Run Tests with Coverage
+      # Optional: Add env vars here if tests need DB connection or other secrets
+      # env:
+      #   DATABASE_URL: ${{ secrets.TEST_DB_URL }}
+      #   SECRET_KEY: ${{ secrets.TEST_SECRET_KEY }}
+      run: poetry run pytest ${{ inputs.pytest-cov-options }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.coverage-artifact-name }}
+        path: ${{ inputs.working-directory }}/htmlcov/ # Path where coverage report is generated
+        retention-days: 7
