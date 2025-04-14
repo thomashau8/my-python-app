@@ -53,7 +53,7 @@ jobs:
           poetry-version: ${{ env.POETRY_VERSION }}
           django-manage-py-path: ${{ env.DJANGO_MANAGE_PY_PATH }}
           pytest-cov-options: ${{ env.PYTEST_COV_OPTIONS }}
-         coverage-artifact-name: 'staging-coverage-report'
+          coverage-artifact-name: 'staging-coverage-report'
 
   security_checks:
     name: Security Checks
