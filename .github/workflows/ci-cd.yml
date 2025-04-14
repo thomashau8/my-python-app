@@ -37,6 +37,9 @@ jobs:
     name: Lint Code
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/run-linter@main # Use version tag later (@v1.0)
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -46,6 +49,9 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/run-tests@main
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -58,6 +64,9 @@ jobs:
     name: Security Checks
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/run-security-checks@main
         with:
           python-version: ${{ env.PYTHON_VERSION }}
