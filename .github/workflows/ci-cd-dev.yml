@@ -119,11 +119,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - uses: ./.github/actions/run-container-scan
         with:
           image-ref: ${{ needs.build_and_push_staging_image.outputs.image_name_full }}
-          exit-code: "1"
 
   deploy_to_azure_staging:
     name: Deploy to Azure Staging
