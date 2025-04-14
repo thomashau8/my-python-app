@@ -125,6 +125,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build_and_push_production_image
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/run-container-scan@main
         with:
           image-ref: ${{ needs.build_and_push_production_image.outputs.image_name_full }}
