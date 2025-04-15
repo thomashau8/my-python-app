@@ -15,11 +15,11 @@ inputs:
   coverage-artifact-name:
     description: 'Name for the coverage report artifact'
     required: false
-    default: 'coverage-report-${{ github.run_id }}-${{ github.job }}' # Make artifact name unique per job/run
+    default: 'coverage-report-${{ github.run_id }}-${{ github.job }}'
   django-manage-py-path:
     description: 'Path relative to working directory for manage.py'
     required: false
-    default: 'manage.py' # Assuming manage.py is at the root
+    default: 'manage.py'
   pytest-cov-options:
     description: 'Options for pytest coverage'
     required: false

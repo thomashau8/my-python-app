@@ -194,12 +194,11 @@ jobs:
 
             [Access Review App](${{ steps.get_url.outputs.review_url }})
 
-      # Failure comment remains the same - checks overall job failure
       - name: Post Failure Comment
         if: failure() && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          header: review-environment-deployment # Same header
+          header: review-environment-deployment
           message: |
             ❌ **Review Environment Deployment Failed:**
 

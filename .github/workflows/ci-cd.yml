@@ -13,10 +13,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - main
+
 env:
   PYTHON_VERSION: "3.12"
   POETRY_VERSION: "2.0.1"
