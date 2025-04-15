@@ -64,4 +64,4 @@ runs:
     - name: Run Hadolint
       uses: hadolint/hadolint-action@v3.1.0
       with:
-        dockerfile: ${{ inputs.working-directory }}/${{ inputs.dockerfile-path }} # Ensure path is relative to checkout
+        dockerfile: ${{ inputs.working-directory }}/${{ inputs.dockerfile-path }}
